@@ -1,14 +1,16 @@
 # backend/main.py
 """
-REDLINE BACKEND — GEN 2
+REDLINE BACKEND — GEN 2.2 (AUTH UPDATE)
 FastAPI entrypoint
-AI-first architecture (no UI logic here)
+
 """
+
 
 import sys
 import os
 import asyncio
 import psutil
+import random
 from datetime import datetime
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
@@ -16,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # =====================================================
-# PATH FIX (żeby widzieć core/ml/trading)
+# PATH FIX
 # =====================================================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
@@ -30,33 +32,49 @@ from trading.wallet import WalletManager
 from backend.ai_core import RedlineAICore
 
 # =====================================================
-# APP
+# APP SETUP
 # =====================================================
 app = FastAPI(
     title="REDLINE API",
-    version="2.0",
+    version="2.2",
     description="AI Trading & Risk Engine"
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:5173"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # =====================================================
-# AI CORE (SINGLE INSTANCE)
+# CORE INSTANCES
 # =====================================================
 ai_core = RedlineAICore(mode="PAPER", timeframe="1h")
 
 # =====================================================
-# MODELE
+# DTO (Data Transfer Objects)
 # =====================================================
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+# NOWY MODEL DLA ROZBUDOWANEJ REJESTRACJI
+class RegisterRequest(BaseModel):
+    fullName: str
+    phone: str
+    email: str
+    about: str
+
+class OrderRequest(BaseModel):
+    symbol: str
+    side: str
+    amount: float
+
+class UserActionRequest(BaseModel):
+    username: str
+    role: str = "USER"
 
 # =====================================================
 # SYSTEM / HEALTH
@@ -81,15 +99,115 @@ def login(req: LoginRequest):
     return {
         "user": req.username,
         "role": role,
+        "token": "mock-jwt-token-access-granted",
         "login_time": datetime.utcnow().isoformat()
     }
 
+@app.post("/api/auth/register")
+def register(req: RegisterRequest):
+    """
+    Obsługa wniosku o dostęp z rozbudowanymi danymi.
+    Mapujemy dane formularza na strukturę bazy UserManagera.
+    """
+    # Username to Email (dla unikalności)
+    username = req.email
+    # Hasło tymczasowe (użytkownik i tak czeka na akceptację admina)
+    temp_password = "PENDING_APPROVAL"
+    
+    # Sklejamy dane kontaktowe w jeden czytelny string dla Admina
+    contact_info = f"Name: {req.fullName} | Phone: {req.phone} | Note: {req.about}"
+
+    success, msg = UserManager.request_account(username, temp_password, contact_info)
+    
+    if not success:
+        # Jeśli taki email już jest w bazie
+        raise HTTPException(status_code=400, detail=msg)
+        
+    return {"status": "REQUEST_SUBMITTED", "message": "Application received"}
+
 # =====================================================
-# WALLET
+# ADMIN API
+# =====================================================
+@app.get("/api/admin/users")
+def get_users():
+    db = UserManager.load_db()
+    clean_active = {u: {k: v for k, v in data.items() if k != 'hash'} for u, data in db.get('active', {}).items()}
+    clean_pending = {u: {k: v for k, v in data.items() if k != 'hash'} for u, data in db.get('pending', {}).items()}
+    return {"active": clean_active, "pending": clean_pending}
+
+@app.post("/api/admin/approve")
+def approve_user(req: UserActionRequest):
+    if UserManager.approve_user(req.username, req.role):
+        return {"status": "APPROVED", "user": req.username, "role": req.role}
+    raise HTTPException(status_code=400, detail="User not found in pending")
+
+@app.post("/api/admin/reject")
+def reject_user(req: UserActionRequest):
+    if UserManager.reject_user(req.username):
+        return {"status": "REJECTED", "user": req.username}
+    raise HTTPException(status_code=400, detail="User not found in pending")
+
+# =====================================================
+# WALLET & TRADING
 # =====================================================
 @app.get("/api/wallet")
 def wallet():
     return WalletManager.get_wallet_data()
+
+@app.get("/api/trading/assets")
+def wallet_assets():
+    data = WalletManager.get_wallet_data()
+    return data.get("assets", [])
+
+@app.get("/api/trading/positions")
+def get_positions():
+    return [
+        {"symbol": "BTC/USDT", "side": "LONG", "size": 0.5, "pnl": 120.50},
+        {"symbol": "ETH/USDT", "side": "SHORT", "size": 10.0, "pnl": -45.00}
+    ]
+
+@app.post("/api/trading/order")
+def execute_order(order: OrderRequest):
+    return {
+        "status": "FILLED",
+        "order_id": f"ORD-{random.randint(1000,9999)}",
+        "price": random.randint(40000, 60000),
+        "symbol": order.symbol
+    }
+
+# =====================================================
+# SCANNER & AI
+# =====================================================
+@app.get("/api/scanner/run")
+def run_scanner():
+    return [
+        {"symbol": "SOL/USDT", "signal": "STRONG BUY", "confidence": 0.89},
+        {"symbol": "XRP/USDT", "signal": "WEAK SELL", "confidence": 0.65}
+    ]
+
+# =====================================================
+# ML / NEURAL LABS
+# =====================================================
+@app.get("/api/ml/status")
+def ml_status():
+    return {
+        "model_version": "2.0.4-alpha",
+        "current_epoch": 45,
+        "total_epochs": 100,
+        "accuracy": 0.78,
+        "loss": 0.3421
+    }
+
+@app.get("/api/ml/chart")
+def ml_chart():
+    data = []
+    for i in range(1, 50):
+        data.append({
+            "epoch": i,
+            "loss": max(0.1, 1.0 - (i * 0.02) + random.uniform(-0.05, 0.05)),
+            "accuracy": min(0.95, 0.5 + (i * 0.01) + random.uniform(-0.02, 0.02))
+        })
+    return data
 
 # =====================================================
 # AI CORE CONTROL
@@ -106,49 +224,26 @@ def set_ai_mode(mode: str):
         raise HTTPException(status_code=400, detail=str(e))
     return ai_core.get_state()
 
-@app.post("/api/ai/run")
-def run_ai_once():
-    """
-    Manual trigger of single AI cycle
-    """
-    return ai_core.run_once()
-
-@app.post("/api/ai/auto/start")
-def start_auto():
-    ai_core.start_auto(interval_sec=3600)
-    return {
-        "status": "AUTO_MODE_STARTED",
-        "interval_sec": 3600
-    }
-
-@app.post("/api/ai/auto/stop")
-def stop_auto():
-    ai_core.stop_auto()
-    return {
-        "status": "AUTO_MODE_STOPPED"
-    }
-
 # =====================================================
-# HUD — REALTIME SYSTEM METRICS
+# HUD
 # =====================================================
 @app.websocket("/ws/hud")
 async def hud_ws(ws: WebSocket):
     await ws.accept()
     try:
         while True:
-            wallet = WalletManager.get_wallet_data()
-
+            wallet_data = WalletManager.get_wallet_data()
             payload = {
                 "time": datetime.now().strftime("%H:%M:%S"),
                 "cpu": psutil.cpu_percent(),
                 "mem": psutil.virtual_memory().percent,
-                "funds": wallet.get("balance", 0.0),
+                "funds": wallet_data.get("balance", 0.0),
                 "ai_mode": ai_core.state["mode"],
                 "ai_running": ai_core.state["running"]
             }
-
+          
             await ws.send_json(payload)
             await asyncio.sleep(1)
-
+    
     except WebSocketDisconnect:
-        pass
+       pass

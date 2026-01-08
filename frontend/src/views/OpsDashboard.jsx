@@ -1,83 +1,167 @@
 import React from 'react';
-
-const StatCard = ({ label, value, sub, status }) => (
-  <div style={{
-    background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #eaeaea',
-    boxShadow: '0 2px 5px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
-  }}>
-    <div>
-      <div style={{fontSize: '11px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px'}}>{label}</div>
-      <div style={{fontSize: '24px', fontWeight: '700', marginTop: '8px', color: '#111', fontFamily: 'monospace'}}>{value}</div>
-    </div>
-    {sub && (
-      <div style={{fontSize: '12px', marginTop: '12px', color: status === 'good' ? '#00c853' : status === 'bad' ? '#ff3d00' : '#666', fontWeight: '600'}}>
-        {sub}
-      </div>
-    )}
-  </div>
-);
-
-const SystemStatus = ({ name, status }) => (
-  <div style={{display:'flex', justifyContent:'space-between', padding:'12px 0', borderBottom:'1px solid #f4f4f5'}}>
-    <span style={{fontSize:'13px', color:'#444'}}>{name}</span>
-    <span style={{fontSize:'12px', fontWeight:'600', color: status === 'OK' ? '#00c853' : '#ff3d00'}}>
-      {status === 'OK' ? '● ONLINE' : '● ERROR'}
-    </span>
-  </div>
-);
+import { useEvents } from '../ws/useEvents';
+import { Activity, Shield, Zap, Server } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts';
 
 const OpsDashboard = () => {
+  const { events } = useEvents();
+
+  // Mock Data dla wykresu
+  const data = [
+    { name: '00:00', load: 20, latency: 12 },
+    { name: '04:00', load: 35, latency: 15 },
+    { name: '08:00', load: 60, latency: 24 },
+    { name: '12:00', load: 85, latency: 45 },
+    { name: '16:00', load: 70, latency: 32 },
+    { name: '20:00', load: 45, latency: 18 },
+    { name: '23:59', load: 30, latency: 14 },
+  ];
+
+  const StatCard = ({ title, value, sub, icon: Icon, color }) => (
+    <div style={{
+      background: '#fff', 
+      borderRadius: '12px', 
+      padding: '24px', 
+      border: '1px solid #eaeaea',
+      display: 'flex',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between'
+    }}>
+      <div>
+        <div style={{color: '#999', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', marginBottom: '8px'}}>{title}</div>
+        <div style={{fontSize: '28px', fontWeight: '700', color: '#111', marginBottom: '4px'}}>{value}</div>
+        <div style={{fontSize: '13px', color: color || '#666'}}>{sub}</div>
+      </div>
+      <div style={{
+        background: color ? `${color}15` : '#f4f4f5', 
+        padding: '12px', 
+        borderRadius: '10px',
+        color: color || '#111'
+      }}>
+        <Icon size={24} />
+      </div>
+    </div>
+  );
+
+  
   return (
     <div>
-      {/* HEADER */}
-      <div style={{marginBottom: '32px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-        <div>
-          <h1 style={{fontSize: '24px', fontWeight: '700', margin: 0, color:'#111'}}>System Operations</h1>
-          <p style={{color: '#666', marginTop: '4px', fontSize:'14px'}}>Live monitoring & risk assessment</p>
-        </div>
-        <div style={{background:'#e3f2fd', color:'#1565c0', padding:'6px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600'}}>
-          MODE: PAPER TRADING
-        </div>
+      <div style={{marginBottom: '32px'}}>
+        <h1 style={{fontSize: '24px', fontWeight: '700', margin: 0}}>Operations Center</h1>
+        <p style={{color: '#666', marginTop: '4px'}}>System health & real-time monitoring</p>
       </div>
 
-      {/* KPI GRID */}
-      <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '32px'}}>
-        <StatCard label="Daily PnL" value="+$324.50" sub="▲ 2.4% vs Avg" status="good" />
-        <StatCard label="Risk Exposure" value="12.5%" sub="Limit: 20%" status="good" />
-        <StatCard label="Win Rate (24h)" value="72%" sub="18 Trades" status="good" />
-        <StatCard label="Sharpe Ratio" value="1.84" sub="Risk Adjusted" status="neutral" />
+      {/* STATS GRID */}
+      <div style={{
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
+        gap: '24px',
+        marginBottom: '32px'
+      }}>
+        <StatCard 
+          title="System Load" 
+          value="42%" 
+          sub="Normal operational range" 
+          icon={Activity} 
+          color="#2962ff"
+        />
+        <StatCard 
+          title="Security Level" 
+          value="SECURE" 
+          sub="No active threats detected" 
+          icon={Shield} 
+          color="#00c853"
+        />
+        <StatCard 
+          title="Execution Latency" 
+          value="24ms" 
+          sub="Avg over last hour" 
+          icon={Zap} 
+          color="#ffab00"
+        />
+        <StatCard 
+          title="Active Nodes" 
+          value="8/8" 
+          sub="All services online" 
+          icon={Server} 
+        />
       </div>
 
+      {/* MAIN CONTENT GRID */}
       <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px'}}>
         
-        {/* ACTIVE TRADES TABLE */}
-        <div style={{background: '#fff', borderRadius: '12px', border: '1px solid #eaeaea', padding: '24px'}}>
-          <h3 style={{margin: '0 0 20px 0', fontSize: '16px', fontWeight: '600'}}>Active Positions</h3>
-          <table style={{width:'100%', borderCollapse:'collapse', fontSize:'13px'}}>
-            <thead>
-              <tr style={{textAlign:'left', color:'#888', borderBottom:'1px solid #eee'}}>
-                <th style={{paddingBottom:'10px'}}>Symbol</th>
-                <th style={{paddingBottom:'10px'}}>Side</th>
-                <th style={{paddingBottom:'10px'}}>Entry</th>
-                <th style={{paddingBottom:'10px'}}>PnL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* MOCK DATA */}
-              <tr><td style={{padding:'12px 0'}}>BTC/USDT</td><td style={{color:'#00c853'}}>LONG</td><td>$43,250</td><td style={{color:'#00c853'}}>+$120.00</td></tr>
-              <tr><td style={{padding:'12px 0'}}>ETH/USDT</td><td style={{color:'#00c853'}}>LONG</td><td>$2,250</td><td style={{color:'#ff3d00'}}>-$-15.50</td></tr>
-            </tbody>
-          </table>
+        {/* LEFT: CHART */}
+        <div style={{
+          background: '#fff', 
+          borderRadius: '16px', 
+          border: '1px solid #eaeaea', 
+          padding: '24px',
+          height: '400px',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <h3 style={{margin: '0 0 24px 0', fontSize: '16px'}}>System Load (24h)</h3>
+          <div style={{flex: 1}}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                <XAxis dataKey="name" stroke="#999" fontSize={12} />
+                <YAxis stroke="#999" fontSize={12} />
+                <Tooltip 
+                  contentStyle={{background: '#fff', borderRadius: '8px', border: '1px solid #eee', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'}}
+                />
+                <Line type="monotone" dataKey="load" stroke="#2962ff" strokeWidth={3} dot={false} />
+                <Line type="monotone" dataKey="latency" stroke="#ffab00" strokeWidth={3} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        {/* SYSTEM HEALTH */}
-        <div style={{background: '#fff', borderRadius: '12px', border: '1px solid #eaeaea', padding: '24px'}}>
-          <h3 style={{margin: '0 0 10px 0', fontSize: '16px', fontWeight: '600'}}>Node Health</h3>
-          <SystemStatus name="Execution Engine" status="OK" />
-          <SystemStatus name="Data Feeds (CCXT)" status="OK" />
-          <SystemStatus name="Neural Brain" status="OK" />
-          <SystemStatus name="Risk Guardian" status="OK" />
+        {/* RIGHT: EVENT LOG */}
+        <div style={{
+          background: '#fff', 
+          borderRadius: '16px', 
+          border: '1px solid #eaeaea', 
+          padding: '24px',
+          height: '400px',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <h3 style={{margin: '0 0 16px 0', fontSize: '16px'}}>Live Event Stream</h3>
+          
+          <div style={{flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px'}}>
+            {events.length === 0 && (
+              <div style={{color: '#999', fontSize: '13px', fontStyle: 'italic'}}>Waiting for system events...</div>
+            )}
+            
+            {events.map((ev, i) => (
+              <div key={i} style={{
+                padding: '12px', 
+                background: '#f9fafb', 
+                borderRadius: '8px', 
+                fontSize: '13px',
+                borderLeft: `3px solid ${ev.level === 'ERROR' ? '#ff3d00' : ev.level === 'WARN' ? '#ffab00' : '#2962ff'}`
+              }}>
+                <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '4px'}}>
+                  <span style={{fontWeight: '700', color: '#111'}}>{ev.type}</span>
+                  <span style={{color: '#999', fontSize: '11px'}}>{ev.timestamp?.split('T')[1]?.split('.')[0]}</span>
+                </div>
+                <div style={{color: '#444'}}>{ev.message}</div>
+              </div>
+            ))}
+          </div>
+
         </div>
+
       </div>
     </div>
   );

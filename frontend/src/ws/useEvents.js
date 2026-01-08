@@ -1,15 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export const useEvents = (scope = "OPS") => {
+  // 1. Dodajemy stan, żeby trzymać listę zdarzeń
+  const [events, setEvents] = useState([]);
   const ws = useRef(null);
 
   useEffect(() => {
-    // Łączymy się z tym samym portem co Backend (przez proxy Vite)
-    // UWAGA: Proxy przekieruje /ws na port 8000
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host; // zazwyczaj localhost:3000
+     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host; // np. localhost:3000
     
     const connect = () => {
+      // Łączymy się z proxy (które przekieruje na backend 8000)
       ws.current = new WebSocket(`${protocol}//${host}/ws/events?scope=${scope}`);
 
       ws.current.onopen = () => {
@@ -20,14 +21,19 @@ export const useEvents = (scope = "OPS") => {
         try {
           const data = JSON.parse(event.data);
           
-          // Ignorujemy Heartbeat w konsoli, żeby nie śmiecić
+          // Ignorujemy Heartbeat
           if (data.type !== 'HEARTBEAT') {
-            // Tutaj w przyszłości wepniemy system "Toasts" (dymki powiadomień)
-            console.log("🔔 EVENT:", data);
+            console.log(" EVENT:", data);
             
-            // Prosty alert browsera dla testu (tylko dla ważnych błędów)
+            // 2. Aktualizujemy stan (dodajemy nowe zdarzenie na górę listy)
+            setEvents((prevEvents) => {
+              // Trzymamy tylko ostatnie 50 zdarzeń, żeby nie zapchać pamięci
+              const newEvents = [data, ...prevEvents];
+              return newEvents.slice(0, 50);
+            });
+
             if (data.level === 'error') {
-               alert(`SYSTEM ALERT: ${data.message}`);
+               console.warn(`SYSTEM ALERT: ${data.message}`);
             }
           }
         } catch (e) {
@@ -37,6 +43,7 @@ export const useEvents = (scope = "OPS") => {
 
       ws.current.onclose = () => {
         console.log('[WS] Events Disconnected. Reconnecting...');
+        // Prosty mechanizm reconnectu
         setTimeout(connect, 5000);
       };
     };
@@ -47,4 +54,7 @@ export const useEvents = (scope = "OPS") => {
       if (ws.current) ws.current.close();
     };
   }, [scope]);
+
+  // 3. WAŻNE: Zwracamy obiekt z tablicą events, tego oczekuje OpsDashboard
+  return { events };
 };

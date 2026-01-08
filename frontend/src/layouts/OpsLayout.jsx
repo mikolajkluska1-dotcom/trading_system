@@ -1,13 +1,14 @@
 import React from 'react';
-import { useEvents } from '../ws/useEvents';
+import { useEvents } from '../ws/useEvents'; // Importujemy, żeby nie psuć hooków
 import { useHud } from '../ws/hud'; 
 import { useAuth } from '../auth/AuthContext';
-import { LayoutDashboard, Wallet, ScanLine, Brain, LogOut } from 'lucide-react';
+import { LayoutDashboard, Wallet, ScanLine, Brain, LogOut, Users } from 'lucide-react';
 
-const OpsLayout = ({ children, activeTab, setActiveTab }) => {
-  // Używamy hooka useHud wyeksportowanego z pliku hud.js
+  const OpsLayout = ({ children, activeTab, setActiveTab }) => {
   const { metrics, connected } = useHud();
   const { logout, user } = useAuth();
+  // useEvents() musi tu być, jeśli używasz go globalnie, ale w tym layoucie jest opcjonalny
+  // const { events } = useEvents(); 
 
   const menuItems = [
     { id: 'dashboard', icon: <LayoutDashboard size={20} />, label: 'Overview' },
@@ -15,6 +16,11 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
     { id: 'scanner', icon: <ScanLine size={20} />, label: 'Scanner' },
     { id: 'training', icon: <Brain size={20} />, label: 'AI Labs' },
   ];
+
+  // LOGIKA ADMINA: Dodajemy panel tylko dla ROOT/ADMIN
+  if (user && ['ROOT', 'ADMIN'].includes(user.role)) {
+    menuItems.push({ id: 'admin', icon: <Users size={20} />, label: 'Admin Panel' });
+  }
 
   // STYLE (Clean Theme)
   const s = {
