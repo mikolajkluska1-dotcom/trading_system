@@ -1,0 +1,23 @@
+# Node
+node_modules/
+dist/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Env / secrets
+.env
+*.key
+*.enc
+
+# OS
+.DS_Store
+
+# Runtime data
+assets/ops_logs/
+assets/training_report.json
+
+# User data
+assets/users_db.json
