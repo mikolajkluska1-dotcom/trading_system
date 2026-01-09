@@ -1,212 +1,175 @@
 # backend/ai_core.py
 """
-REDLINE AI CORE — GEN 2
-Stateful, Explainable, Auto-Trading Ready
-
-ML logic lives in /ml
-This file orchestrates decisions only.
+REDLINE AI CORE — GEN 3.8 (HYBRID INTELLIGENCE)
+Integration: Logic Engine + Neural Network (DeepBrain)
 """
 
-import time
-import threading
-from datetime import datetime, timedelta
+import logging
+import hashlib
+from datetime import datetime
 
-from ml.scanner import MarketScanner
+# ML Imports
 from ml.brain import DeepBrain
-from ml.regime import MarketRegime
 
-from trading.decision import DecisionEngine
-from trading.execution import ExecutionEngine
-from trading.wallet import WalletManager
+# Logging setup
+logging.basicConfig(
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger("AI_CORE")
 
-from core.logger import log_event
-from core.event_logger import EventLogger
+class TradeSignal:
+    """Struktura wyniku decyzji"""
+    def __init__(self, symbol, score, confidence, action, reasons, flags, decision_id, ml_data=None):
+        self.symbol = symbol
+        self.score = score           # 0-100
+        self.confidence = confidence # 0.0 - 1.0
+        self.action = action         # STRONG_BUY, BUY, HOLD, SELL...
+        self.reasons = reasons       # Lista uzasadnień
+        self.flags = flags           # Flagi ryzyka
+        self.decision_id = decision_id
+        self.ml_data = ml_data or {} # Wyniki z sieci neuronowej
+        self.timestamp = datetime.utcnow().isoformat()
 
+    def __repr__(self):
+        return f"Signal({self.symbol}: {self.action} | Score: {self.score} | Conf: {self.confidence:.2f})"
+
+class DecisionEngine:
+    """Silnik Logiczny (Regułowy)"""
+    def __init__(self):
+        self.weights = {"RSI": 25, "TREND": 25, "VOLATILITY_PENALTY": 20}
+
+    def analyze(self, symbol, market_data):
+        """Zwraca bazowy Score na podstawie analizy technicznej"""
+        score = 50.0
+        confidence = 1.0
+        reasons = []
+        flags = []
+
+        price = market_data.get('close', 0.0)
+        if price <= 0: return 50, 0, "HOLD", ["Invalid Data"], ["ERR"]
+
+        # 1. Volatility Penalty
+        volatility = market_data.get('volatility', 0.0)
+        if volatility > 0.03:
+            flags.append("HIGH_VOLATILITY")
+            confidence -= 0.3
+            score -= 10
+            reasons.append(f"High Volatility ({volatility:.1%})")
+
+        # 2. RSI
+        rsi = market_data.get('rsi', 50.0)
+        if rsi < 30:
+            score += 20
+            reasons.append(f"RSI Oversold ({rsi:.0f})")
+        elif rsi > 70:
+            score -= 20
+            reasons.append(f"RSI Overbought ({rsi:.0f})")
+
+        # 3. Trend
+        sma = market_data.get('sma_50', price)
+        if price > sma * 1.005:
+            score += 15
+            reasons.append("Uptrend (Price > SMA)")
+        elif price < sma * 0.995:
+            score -= 15
+            reasons.append("Downtrend (Price < SMA)")
+
+        return score, confidence, reasons, flags
 
 class RedlineAICore:
     """
-    Central AI Orchestrator (GEN-2)
+    HYBRID ORCHESTRATOR
+    Łączy logikę klasyczną (DecisionEngine) z intuicją ML (DeepBrain).
     """
-
+  
     def __init__(self, mode="PAPER", timeframe="1h"):
-        self.mode = mode
-        self.timeframe = timeframe
-
-        # ML
-        self.scanner = MarketScanner(timeframe=timeframe)
-        self.brain = DeepBrain()
-
-        # Trading
-        self.decision = DecisionEngine(mode=mode)
-        self.executor = ExecutionEngine(mode=mode)
-
-        # ===== AI STATE =====
+  
         self.state = {
-            "mode": "SEMI",               # MANUAL | SEMI | AUTO
-            "running": False,
-            "last_cycle": None,
-            "ai_score": 0.0,
-            "cooldowns": {},              # symbol -> datetime
-            "last_signals": {},           # symbol -> signal
-            "errors": 0
+            "mode": mode,
+            "running": True,
+            "timeframe": timeframe,
+            "engine": "GEN-3.8 (Hybrid)"
         }
-
-        log_event(f"AI CORE GEN-2 INIT [{mode} | {timeframe}]", "INFO")
-
-    # =====================================================
-    # PUBLIC CONTROL
-    # =====================================================
-    def set_mode(self, mode: str):
-        if mode not in {"MANUAL", "SEMI", "AUTO"}:
-            raise ValueError("Invalid AI mode")
-        self.state["mode"] = mode
-        log_event(f"AI MODE SET → {mode}", "WARN")
+        # Dwa półkule mózgu
+        self.logic_brain = DecisionEngine()
+        self.neural_brain = DeepBrain() # ML V7
+        
+        logger.info(f"AI CORE INITIALIZED: {self.state}")
 
     def get_state(self):
-        wallet = WalletManager.get_wallet_data()
-        return {
-            **self.state,
-            "balance": wallet.get("balance", 0.0),
-            "positions": wallet.get("assets", []),
-        }
+        return self.state
 
-    # =====================================================
-    # MAIN AI CYCLE
-    # =====================================================
-    def run_once(self):
+    def set_mode(self, mode):
+        self.state["mode"] = mode.upper()
+
+    def _generate_id(self, symbol, score, action):
+        raw = f"{symbol}|{score}|{action}|{datetime.utcnow().timestamp()}"
+        return hashlib.sha256(raw.encode()).hexdigest()[:12]
+
+    def evaluate(self, symbol, market_data, df, config):
         """
-        One full AI decision cycle.
+        Główna metoda decyzyjna.
+        Wymaga: market_data (dict) ORAZ df (DataFrame dla ML)
         """
-        self.state["last_cycle"] = datetime.utcnow().isoformat()
-        log_event("AI CYCLE START", "INFO")
+        # 1. Lewa półkula: Logika (Reguły)
+        l_score, l_conf, l_reasons, l_flags = self.logic_brain.analyze(symbol, market_data)
 
-        try:
-            df = self.scanner.scan()
-            if df.empty:
-                log_event("SCAN EMPTY", "WARN")
-                return []
+        # 2. Prawa półkula: Intuicja (DeepBrain ML)
+        # Zwraca: (price_pred, ml_conf, ml_signal)
+        ml_pred, ml_conf, ml_sig = self.neural_brain.predict(df)
+        
+        # 3. Fuzja Danych (Hybrid Consensus)
+        final_score = l_score
+        final_conf = l_conf
+        
+        # ML Impact - Jeśli ML jest pewne (>0.6), wpływa na wynik
+        if ml_conf > 0.6:
+            if ml_sig == "BUY":
+                final_score += 15
+                l_reasons.append(f"ML Confirms BUY (Conf {ml_conf:.2f})")
+            elif ml_sig == "SELL":
+                final_score -= 15
+                l_reasons.append(f"ML Confirms SELL (Conf {ml_conf:.2f})")
+            
+            # Boost pewności jeśli logika i ML się zgadzają
+            if (l_score > 60 and ml_sig == "BUY") or (l_score < 40 and ml_sig == "SELL"):
+                final_conf = min(1.0, final_conf + 0.15)
+                l_reasons.append("HYBRID CONFLUENCE") # Najsilniejszy sygnał
+        
+        # OOD Protection (z DeepBraina)
+        if "OOD" in ml_sig:
+            final_conf = 0.0
+            l_reasons.append(f"ML Veto: {ml_sig}")
+            l_flags.append("AI_OOD_EVENT")
 
-            results = []
+        # 4. Finalna Klasyfikacja
+        final_score = max(0, min(100, final_score))
+        min_conf = config.get("min_confidence", 0.6)
+        
+        action = "HOLD"
+        if final_conf >= min_conf:
+            if final_score >= 85: action = "STRONG_BUY"
+            elif final_score >= 65: action = "BUY"
+            elif final_score <= 15: action = "STRONG_SELL"
+            elif final_score <= 35: action = "SELL"
+        else:
+            l_reasons.append(f"Low Confidence ({final_conf:.2f})")
 
-            for _, row in df.head(5).iterrows():
-                symbol = row["symbol"]
+        # 5. Wynik
+        decision_id = self._generate_id(symbol, final_score, action)
+        
+        # Logujemy tylko silne sygnały, żeby nie śmiecić
+        if "STRONG" in action:
+            logger.info(f"🧠 HYBRID SIGNAL: {symbol} {action} (Score: {final_score:.0f}, ML Conf: {ml_conf:.2f})")
 
-                # ===== COOLDOWN CHECK =====
-                cd = self.state["cooldowns"].get(symbol)
-                if cd and datetime.utcnow() < cd:
-                    results.append({
-                        "symbol": symbol,
-                        "status": "COOLDOWN"
-                    })
-                    continue
-
-                # ===== SIGNAL LOG =====
-                signal_id = EventLogger.log_signal(
-                    symbol=symbol,
-                    tf=self.timeframe,
-                    signal=row.get("signal"),
-                    conf=row.get("confidence", 0),
-                    mqs=row.get("mqs", 0),
-                    htf_trend=row.get("htf_trend", "NEUTRAL"),
-                    ev=row.get("ev", 0),
-                )
-
-                candidate = {
-                    "symbol": symbol,
-                    "signal": row.get("signal"),
-                    "conf": row.get("confidence"),
-                    "mqs": row.get("mqs"),
-                    "current_price": row.get("price"),
-                    "reasons": row.get("reasons", [])
-                }
-
-                # ===== DECISION =====
-                approved, reason, size = self.decision.evaluate_entry(candidate)
-
-                EventLogger.log_decision(
-                    symbol=symbol,
-                    signal=candidate["signal"],
-                    approved=approved,
-                    reason=reason,
-                    size_usd=size,
-                    signal_id=signal_id
-                )
-
-                if not approved:
-                    results.append({
-                        "symbol": symbol,
-                        "status": "REJECTED",
-                        "reason": reason
-                    })
-                    continue
-
-                # ===== SEMI MODE =====
-                if self.state["mode"] == "SEMI":
-                    results.append({
-                        "symbol": symbol,
-                        "status": "APPROVED_WAITING",
-                        "size": size
-                    })
-                    continue
-
-                # ===== AUTO MODE =====
-                if self.state["mode"] == "AUTO":
-                    exec_res = self.executor.execute_order(
-                        symbol=symbol,
-                        side="BUY",
-                        amount_usd=size,
-                        signal_id=signal_id
-                    )
-
-                    if exec_res.get("status") == "FILLED":
-                        EventLogger.log_execution(
-                            symbol=symbol,
-                            side="BUY",
-                            entry_price=exec_res.get("avg_price"),
-                            qty=exec_res.get("qty"),
-                            cost=exec_res.get("cost"),
-                            order_status="FILLED",
-                            signal_id=signal_id
-                        )
-
-                        # cooldown 1 cycle
-                        self.state["cooldowns"][symbol] = (
-                            datetime.utcnow() + timedelta(minutes=30)
-                        )
-
-                    results.append(exec_res)
-
-            log_event("AI CYCLE END", "INFO")
-            return results
-
-        except Exception as e:
-            self.state["errors"] += 1
-            log_event(f"AI CORE ERROR: {e}", "CRITICAL")
-            return []
-
-    # =====================================================
-    # AUTO MODE LOOP
-    # =====================================================
-    def _auto_loop(self, interval_sec: int):
-        log_event("AI AUTO LOOP STARTED", "WARN")
-        self.state["running"] = True
-
-        while self.state["running"]:
-            self.run_once()
-            time.sleep(interval_sec)
-
-    def start_auto(self, interval_sec: int = 3600):
-        if self.state["running"]:
-            return
-        self.set_mode("AUTO")
-        thread = threading.Thread(
-            target=self._auto_loop,
-            args=(interval_sec,),
-            daemon=True
+        return TradeSignal(
+            symbol, 
+            round(final_score, 1), 
+            round(final_conf, 2), 
+            action, 
+            l_reasons, 
+            l_flags, 
+            decision_id,
+            ml_data={"pred": ml_pred, "conf": ml_conf, "sig": ml_sig}
         )
-        thread.start()
-
-    def stop_auto(self):
-        self.state["running"] = False
-        self.set_mode("SEMI")
-        log_event("AI AUTO LOOP STOPPED", "WARN")
