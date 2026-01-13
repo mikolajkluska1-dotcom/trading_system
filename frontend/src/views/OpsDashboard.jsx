@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useEvents } from '../ws/useEvents';
-import { Activity, Shield, Zap, Server, Play, Search, Target, CheckCircle, Brain, Terminal } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useMission } from '../context/MissionContext';
+import { Activity, Shield, Zap, TrendingUp, DollarSign, AlertCircle } from 'lucide-react';
 import Scene3D from '../components/Scene3D';
 import TiltCard from '../components/TiltCard';
 
@@ -25,7 +25,7 @@ const chartOptions = {
   maintainAspectRatio: false,
   scales: {
     x: { display: false },
-    y: { display: false },
+    y: { beginAtZero: false, display: false },
   },
   plugins: {
     legend: { display: false },
@@ -34,212 +34,357 @@ const chartOptions = {
       titleColor: '#fff',
       bodyColor: '#fff',
       borderColor: 'rgba(255,255,255,0.1)',
-      borderWidth: 1
+      borderWidth: 1,
+      padding: 12
     }
   },
   elements: {
     line: { tension: 0.4 },
-    point: { radius: 0 }
+    point: { radius: 0, hoverRadius: 4 }
   },
   interaction: { intersect: false, mode: 'index' },
 };
 
 const OpsDashboard = () => {
   const { events } = useEvents();
-  const [missionActive, setMissionActive] = useState(false);
-  const [logs, setLogs] = useState([]);
-  const [scanList, setScanList] = useState([]);
-  const [targetAsset, setTargetAsset] = useState(null);
+  const { isAiActive, toggleAiCore, missionSummary } = useMission();
+  const [portfolioValue, setPortfolioValue] = useState(10000);
+  const [recentAlerts, setRecentAlerts] = useState([]);
 
-  // Fake Chart Data for Dashboard Main View
-  const [mainChartData, setMainChartData] = useState({
-    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '23:59'],
-    datasets: [
-      {
-        fill: true,
-        data: [20, 35, 60, 85, 70, 45, 30],
-        borderColor: '#3a86ff',
-        backgroundColor: 'rgba(58, 134, 255, 0.1)',
-        borderWidth: 3,
-      }
-    ]
+  // Portfolio Chart Data (Simplified)
+  const [portfolioChart, setPortfolioChart] = useState({
+    labels: Array(20).fill(''),
+    datasets: [{
+      fill: true,
+      data: Array(20).fill(0).map((_, i) => 10000 + Math.sin(i / 2) * 500 + i * 50),
+      borderColor: 'var(--neon-gold)',
+      backgroundColor: 'rgba(226, 183, 20, 0.1)',
+      borderWidth: 3,
+    }]
   });
 
-  // Handle Event Stream
+  // Capture alerts from event stream
   useEffect(() => {
     if (!events.length) return;
     const last = events[0];
-    // Simple log dedupe
-    setLogs(prev => {
-      if (prev[0]?.msg === last.message) return prev;
-      return [{ time: new Date().toLocaleTimeString(), msg: last.message, type: last.type }, ...prev].slice(0, 50);
-    });
 
-    if (missionActive) {
-      if (last.type === 'SCAN_UPDATE') {
-        setScanList(prev => [{ s: last.symbol, v: last.volatility }, ...prev].slice(0, 5));
-      }
-      if (last.type === 'TARGET_ACQUIRED') {
-        setTargetAsset(last.symbol);
-      }
+    // Add important events to alerts
+    if (['MISSION_START', 'TARGET_ACQUIRED', 'ORDER_FILLED', 'MISSION_COMPLETE', 'ERROR'].includes(last.type)) {
+      setRecentAlerts(prev => [
+        {
+          time: new Date().toLocaleTimeString(),
+          message: last.message,
+          type: last.type
+        },
+        ...prev
+      ].slice(0, 8));
     }
-  }, [events, missionActive]);
 
-  const handleRunAutopilot = () => {
-    setMissionActive(true);
-    fetch('http://localhost:8000/api/scanner/run_cycle', { method: 'POST' }).catch(console.error);
-  };
+    // Update portfolio value on mission complete
+    if (last.type === 'MISSION_SUMMARY' && last.pnl) {
+      setPortfolioValue(prev => prev + parseFloat(last.pnl || 0));
+    }
+  }, [events]);
 
-  const StatItem = ({ label, value, sub, icon: Icon, color }) => (
-    <TiltCard className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '160px' }}>
+  const StatCard = ({ label, value, sub, icon: Icon, color, trend }) => (
+    <TiltCard className="glass-panel" style={{
+      padding: '28px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '16px'
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ background: `${color}20`, padding: '10px', borderRadius: '12px' }}>
-          <Icon size={20} color={color} />
+        <div style={{
+          background: `${color}20`,
+          padding: '12px',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <Icon size={24} color={color} />
         </div>
-        <Activity size={16} className={label === 'System Load' ? 'animate-spin' : ''} color="var(--text-dim)" />
+        {trend && (
+          <div style={{
+            fontSize: '12px',
+            fontWeight: '700',
+            color: trend > 0 ? '#00e676' : '#ff3d00',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <TrendingUp size={14} style={{ transform: trend < 0 ? 'rotate(180deg)' : 'none' }} />
+            {Math.abs(trend).toFixed(1)}%
+          </div>
+        )}
       </div>
       <div>
-        <div style={{ fontSize: '32px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>{value}</div>
-        <div style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</div>
-        {sub && <div style={{ fontSize: '11px', color: color, marginTop: '4px' }}>{sub}</div>}
+        <div style={{
+          fontSize: '36px',
+          fontWeight: '800',
+          color: '#fff',
+          marginBottom: '4px',
+          fontFamily: "'Space Grotesk', monospace"
+        }}>
+          {value}
+        </div>
+        <div style={{
+          fontSize: '11px',
+          color: 'var(--text-dim)',
+          fontWeight: '600',
+          textTransform: 'uppercase',
+          letterSpacing: '1px'
+        }}>
+          {label}
+        </div>
+        {sub && <div style={{ fontSize: '12px', color: color, marginTop: '8px', fontWeight: '600' }}>{sub}</div>}
       </div>
     </TiltCard>
   );
 
   return (
-    <div className="fade-in" style={{ position: 'relative', minHeight: '100vh', width: '100%', overflowX: 'hidden', padding: '40px' }}>
+    <div className="fade-in" style={{ position: 'relative', minHeight: '100vh', width: '100%' }}>
 
-      {/* BACKGROUND (Like Login) */}
-      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1 }}>
+      {/* BACKGROUND */}
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1, opacity: 0.4 }}>
         <Scene3D />
         <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, transparent 0%, #050505 90%)' }} />
       </div>
 
-      {/* TOP NAV */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '60px' }}>
-        <div>
-          <h1 className="text-glow" style={{ fontSize: '42px', fontWeight: '800', marginBottom: '8px' }}>Command Center</h1>
-          <p style={{ color: 'var(--text-dim)', fontSize: '16px' }}>Nodes Online • Secure Uplink Established</p>
-        </div>
-        <button onClick={handleRunAutopilot} className="btn-premium" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 32px' }}>
-          <Play size={18} fill="currentColor" /> INITIATE AUTO-PILOT
-        </button>
+      {/* HEADER */}
+      <div style={{ marginBottom: '40px' }}>
+        <h1 className="text-glow" style={{
+          fontSize: '42px',
+          fontWeight: '800',
+          marginBottom: '8px',
+          background: 'linear-gradient(135deg, #fff 0%, var(--neon-gold) 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent'
+        }}>
+          Command Center
+        </h1>
+        <p style={{ color: 'var(--text-dim)', fontSize: '16px' }}>
+          Secure Uplink Established • {isAiActive ? '🟢 AI Core Online' : '🔴 AI Core Standby'}
+        </p>
       </div>
 
-      {/* STATS GRID */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', marginBottom: '40px' }}>
-        <StatItem label="System Load" value="42%" sub="Optimal" icon={Activity} color="var(--neon-blue)" />
-        <StatItem label="Security" value="SECURE" sub="AES-256" icon={Shield} color="#00e676" />
-        <StatItem label="Latency" value="24ms" sub="Global Relay" icon={Zap} color="var(--neon-gold)" />
-        <StatItem label="Active Nodes" value="8/8" sub="Cluster OK" icon={Server} color="var(--neon-purple)" />
+      {/* TOP STATS */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+        gap: '24px',
+        marginBottom: '40px'
+      }}>
+        <StatCard
+          label="Portfolio Value"
+          value={`$${portfolioValue.toLocaleString()}`}
+          sub="Total Assets"
+          icon={DollarSign}
+          color="var(--neon-gold)"
+          trend={2.4}
+        />
+        <StatCard
+          label="AI Status"
+          value={isAiActive ? "ACTIVE" : "STANDBY"}
+          sub={isAiActive ? "Neural Link Engaged" : "Awaiting Authorization"}
+          icon={Activity}
+          color={isAiActive ? "#00e676" : "#ff9100"}
+        />
+        <StatCard
+          label="Security"
+          value="SECURE"
+          sub="AES-256 Encryption"
+          icon={Shield}
+          color="#00e676"
+        />
+        <StatCard
+          label="Latency"
+          value="18ms"
+          sub="Global Relay Active"
+          icon={Zap}
+          color="var(--neon-blue)"
+        />
       </div>
 
-      {/* MAIN CONTENT SPLIT */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '30px', height: '500px' }}>
+      {/* MAIN CONTENT GRID */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px' }}>
 
-        {/* MAIN CHART */}
-        <div className="glass-panel" style={{ padding: '30px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '1px' }}>Network Throughput</h3>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {['1H', '24H', '7D'].map(d => (
-                <span key={d} style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '20px', background: d === '24H' ? 'rgba(255,255,255,0.1)' : 'transparent', color: d === '24H' ? '#fff' : 'var(--text-dim)', cursor: 'pointer' }}>{d}</span>
-              ))}
+        {/* PORTFOLIO CHART */}
+        <div className="glass-panel" style={{
+          padding: '32px',
+          minHeight: '400px',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{
+              fontSize: '14px',
+              fontWeight: '700',
+              color: 'var(--text-dim)',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              marginBottom: '8px'
+            }}>
+              Portfolio Performance
+            </h3>
+            <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--neon-gold)' }}>
+              ${portfolioValue.toLocaleString()}
             </div>
           </div>
           <div style={{ flex: 1 }}>
-            <Line options={chartOptions} data={mainChartData} />
+            <Line options={chartOptions} data={portfolioChart} />
           </div>
         </div>
 
-        {/* EVENT LOGS */}
-        <div className="glass-panel" style={{ padding: '0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '20px', borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)' }}>
-            <h3 style={{ fontSize: '13px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Terminal size={14} color="var(--neon-gold)" /> TERMINAL FEED
+        {/* RECENT ALERTS */}
+        <div className="glass-panel" style={{
+          padding: '0',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          minHeight: '400px'
+        }}>
+          <div style={{
+            padding: '20px 24px',
+            borderBottom: '1px solid var(--glass-border)',
+            background: 'rgba(0,0,0,0.3)'
+          }}>
+            <h3 style={{
+              fontSize: '13px',
+              fontWeight: '800',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              textTransform: 'uppercase',
+              letterSpacing: '1px'
+            }}>
+              <AlertCircle size={16} color="var(--neon-gold)" />
+              Recent Alerts
             </h3>
           </div>
-          <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '20px', fontFamily: 'monospace', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {logs.map((l, i) => (
-              <div key={i} style={{ display: 'flex', gap: '12px', opacity: 0.9 }}>
-                <span style={{ color: 'var(--text-dim)', minWidth: '60px' }}>{l.time.split(' ')[0]}</span>
-                <span style={{ color: l.type === 'ERROR' ? '#ff3d00' : l.type === 'SUCCESS' ? '#00e676' : '#fff' }}>
-                  {l.msg}
-                </span>
+          <div className="custom-scrollbar" style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            {recentAlerts.length === 0 ? (
+              <div style={{
+                color: 'var(--text-dim)',
+                fontStyle: 'italic',
+                fontSize: '13px',
+                textAlign: 'center',
+                padding: '40px 20px'
+              }}>
+                No recent alerts. System monitoring...
               </div>
-            ))}
-            {logs.length === 0 && <span style={{ color: 'var(--text-dim)', fontStyle: 'italic' }}>Listening for neural events...</span>}
+            ) : (
+              recentAlerts.map((alert, i) => (
+                <div key={i} className="glass-panel" style={{
+                  padding: '14px',
+                  background: 'rgba(255,255,255,0.02)',
+                  borderRadius: '10px',
+                  borderLeft: `3px solid ${alert.type === 'ERROR' ? '#ff3d00' :
+                    alert.type === 'MISSION_COMPLETE' ? '#00e676' :
+                      alert.type === 'ORDER_FILLED' ? 'var(--neon-gold)' :
+                        'var(--neon-blue)'
+                    }`
+                }}>
+                  <div style={{
+                    fontSize: '10px',
+                    color: 'var(--text-dim)',
+                    marginBottom: '4px',
+                    fontWeight: '600'
+                  }}>
+                    {alert.time}
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    color: '#fff',
+                    lineHeight: '1.4'
+                  }}>
+                    {alert.message}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
-
       </div>
 
-      {/* AUTOPILOT OVERLAY */}
-      <AnimatePresence>
-        {missionActive && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(5,5,5,0.95)', backdropFilter: 'blur(20px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <div className="glass-panel" style={{ width: '90%', maxWidth: '1200px', height: '80vh', padding: '40px', display: 'flex', flexDirection: 'column', boxShadow: '0 0 100px rgba(0,0,0,0.8)' }}>
+      {/* AI CONTROL */}
+      <div className="glass-panel" style={{
+        marginTop: '32px',
+        padding: '28px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: isAiActive ? 'rgba(0, 230, 118, 0.05)' : 'rgba(255, 145, 0, 0.05)',
+        border: `1px solid ${isAiActive ? '#00e676' : '#ff9100'}`
+      }}>
+        <div>
+          <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '6px' }}>
+            Neural Core Control
+          </h3>
+          <p style={{ color: 'var(--text-dim)', fontSize: '13px' }}>
+            {isAiActive
+              ? 'Autonomous trading protocol active. AI making decisions in real-time.'
+              : 'AI Core is on standby. Toggle to activate autonomous trading.'}
+          </p>
+        </div>
+        <button
+          onClick={toggleAiCore}
+          className={isAiActive ? 'btn-premium' : 'glow-btn'}
+          style={{
+            padding: '16px 32px',
+            fontSize: '14px',
+            fontWeight: '700',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            background: isAiActive ? '#00e676' : 'rgba(226, 183, 20, 0.2)',
+            color: isAiActive ? '#000' : 'var(--neon-gold)',
+            border: isAiActive ? 'none' : '1px solid var(--neon-gold)'
+          }}
+        >
+          <Activity size={18} />
+          {isAiActive ? 'DEACTIVATE' : 'ACTIVATE'}
+        </button>
+      </div>
 
-              {/* Modal Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                  <Brain size={48} color="var(--neon-gold)" className="animate-pulse" />
-                  <div>
-                    <h2 className="text-glow" style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1' }}>NEURAL AUTOPILOT</h2>
-                    <p style={{ color: 'var(--neon-gold)', marginTop: '5px' }}> Autonomous Execution Protocol Engaged</p>
-                  </div>
-                </div>
-                <button onClick={() => setMissionActive(false)} className="glass-panel hover:bg-white/10" style={{ padding: '12px 24px', cursor: 'pointer' }}>ABORT MISSION</button>
-              </div>
-
-              {/* Modal Content */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', flex: 1 }}>
-
-                {/* Dynamic Visualizer */}
-                <TiltCard className="glass-panel" style={{ padding: '30px', background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {!targetAsset ? (
-                    <div style={{ textAlign: 'center' }}>
-                      <Search size={64} color="var(--text-dim)" className="animate-ping" style={{ marginBottom: '30px', opacity: 0.5 }} />
-                      <h3 style={{ fontSize: '24px', fontWeight: '300' }}>Scanning Global Liquidity...</h3>
-                      <div style={{ display: 'flex', gap: '10px', marginTop: '30px', justifyContent: 'center' }}>
-                        {scanList.map(s => (
-                          <motion.div key={s.s} initial={{ scale: 0 }} animate={{ scale: 1 }} className="glass-panel" style={{ padding: '8px 16px', fontSize: '12px', background: 'rgba(255,255,255,0.1)' }}>
-                            {s.s}
-                          </motion.div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: 'center', width: '100%' }}>
-                      <Target size={80} color="#00e676" style={{ marginBottom: '20px' }} />
-                      <h2 style={{ fontSize: '48px', fontWeight: '800', color: '#00e676', textShadow: '0 0 40px rgba(0,255,100,0.4)' }}>{targetAsset}</h2>
-                      <p style={{ letterSpacing: '2px', color: 'var(--text-dim)' }}>TARGET ACQUIRED</p>
-                    </div>
-                  )}
-                </TiltCard>
-
-                {/* Live Logs */}
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ marginBottom: '20px', fontSize: '14px', fontWeight: '800', color: 'var(--text-dim)', letterSpacing: '1px' }}>EXECUTION LOG</div>
-                  <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', background: '#000', borderRadius: '16px', border: '1px solid var(--glass-border)', padding: '20px', fontFamily: 'monospace', fontSize: '13px' }}>
-                    {logs.map((l, i) => (
-                      <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} key={i} style={{ marginBottom: '12px', display: 'flex', gap: '15px' }}>
-                        <span style={{ color: 'var(--text-dim)' }}>{l.time.split(' ')[0]}</span>
-                        <span style={{ color: l.type === 'ERROR' ? '#ff4d4d' : '#fff' }}>{l.msg}</span>
-                      </motion.div>
-                    ))}
-                    {logs.length === 0 && <span className="animate-pulse" style={{ color: 'var(--neon-gold)' }}>Initializing Neural Core...</span>}
-                  </div>
-                </div>
-              </div>
-
+      {/* MISSION SUMMARY (if available) */}
+      {missionSummary && (
+        <div className="glass-panel" style={{
+          marginTop: '24px',
+          padding: '24px',
+          background: 'rgba(0, 230, 118, 0.05)',
+          border: '1px solid #00e676'
+        }}>
+          <h4 style={{ fontSize: '14px', fontWeight: '800', marginBottom: '12px', color: '#00e676' }}>
+            Last Mission Summary
+          </h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', fontSize: '13px' }}>
+            <div>
+              <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>Symbol</div>
+              <div style={{ fontWeight: '700', color: '#fff' }}>{missionSummary.symbol}</div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <div>
+              <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>Entry</div>
+              <div style={{ fontWeight: '700', color: '#fff' }}>${missionSummary.entry_price?.toFixed(2)}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>Exit</div>
+              <div style={{ fontWeight: '700', color: '#fff' }}>${missionSummary.exit_price?.toFixed(2)}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>P&L</div>
+              <div style={{ fontWeight: '700', color: '#00e676' }}>+${missionSummary.pnl?.toFixed(2)}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

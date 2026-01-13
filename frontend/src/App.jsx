@@ -8,11 +8,10 @@ import InvestorDashboard from './views/InvestorDashboard';
 
 // Widoki funkcjonalne
 import Wallet from './views/Wallet';
-import Scanner from './views/Scanner';
 import Training from './views/training';
 import AdminPanel from './views/AdminPanel';
-import MissionControl from './views/MissionControl';
-import AISettings from './views/AISettings'; // New import
+import AISettings from './views/AISettings';
+import TradingHub from './views/TradingHub'; // New consolidated view
 
 import OpsLayout from './layouts/OpsLayout';
 
@@ -45,10 +44,9 @@ const AppContent = () => {
   return (
     <OpsLayout activeTab={activeTab} setActiveTab={setActiveTab}>
       {activeTab === 'dashboard' && renderDashboard()}
+      {activeTab === 'trading-hub' && <TradingHub />}
       {activeTab === 'wallet' && <Wallet />}
-      {activeTab === 'scanner' && <Scanner />}
       {activeTab === 'training' && <Training />}
-      {activeTab === 'autopilot' && <MissionControl />}
       {activeTab === 'admin' && <AdminPanel />}
       {activeTab === 'ai-settings' && <AISettings />}
     </OpsLayout>

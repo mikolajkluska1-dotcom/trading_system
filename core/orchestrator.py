@@ -1,5 +1,6 @@
 import time
 import random
+import asyncio
 from core.logger import log_event
 from ml.scanner import MarketScanner
 from trading.decision import DecisionEngine
@@ -48,66 +49,7 @@ class Orchestrator:
         if time.time() - self.last_tick_ts > 10: # Min 10s between reactions per symbol
              pass
 
-    def run_cycle(self):
-        """
-        Główna pętla logiczna. Może być wywoływana zewnętrznie.
-        """
-        # 1. RISK CHECK
-        self.position_manager.manage_positions()
-        is_safe, risk_msg = self.position_manager.check_global_risk()
-        if not is_safe:
-            log_event(f"LOCKED: {risk_msg}", "SEC")
-            return
-
-        log_event("--- TRADING CYCLE START ---", "INFO")
-
-        # 2. SCAN
-        opportunities = self.scanner.scan()
-        if opportunities.empty: return
-
-        candidates = opportunities.head(3)
-
-        for _, cand in candidates.iterrows():
-            # 3. DECISION (Loguje event DECISION)
-            approved, reason, size = self.decision_engine.evaluate_entry(cand, risk_status=is_safe)
-
-            if approved:
-                log_event(f"GO: {cand['symbol']} (${size})", "SUCCESS")
-
-                # 4. EXECUTION
-                sig_id = cand.get('signal_id')
-                res = self.execution_engine.execute_order(cand['symbol'], "BUY", size, signal_id=sig_id)
-
-                if res['status'] == 'FILLED':
-                    log_event(f"FILLED: {cand['symbol']}", "TRADE")
-            else:
-                log_event(f"SKIP {cand['symbol']}: {reason}", "INFO")
-
-    def start_loop(self, interval=3600):
-        self.is_running = True
-        log_event("AUTO-PILOT ON", "succ")
-        try:
-            while self.is_running:
-                self.run_cycle()
-                time.sleep(interval)
-        except KeyboardInterrupt:
-            self.stop()
-
-    def stop(self):
-        self.is_running = False
-        log_event("SYSTEM HALTED", "WARN")
-
-    def set_autopilot(self, active: bool):
-        """
-        Enables or disables the continuous trading loop.
-        """
-        if active:
-            if not self.is_running:
-                self.is_running = True
-                log_event("AI CORE: ONLINE (AUTOPILOT ENGAGED)", "SUCCESS")
-        else:
-            self.is_running = False
-            log_event("AI CORE: OFFLINE (STANDBY)", "WARN")
+    # REMOVED: Duplicate synchronous methods (moved to async versions below)
 
     async def broadcast(self, type, payload=None):
         if hasattr(self, 'ws_manager'):
@@ -129,6 +71,12 @@ class Orchestrator:
         """
         Executes a single trading cycle. Now unified with demonstration logic for UI consistency.
         """
+        log_event(f"🔄 Loop heartbeat. AI Active: {self.is_running}", "INFO")
+        if not self.is_running:
+            log_event("⏸️  AI CORE is OFFLINE. Skipping cycle.", "WARN")
+            return
+        
+        log_event("🚀 Executing Trading Cycle...", "INFO")
         await self.run_demonstration_mission()
 
     async def start_autopilot_loop(self):
@@ -161,25 +109,45 @@ class Orchestrator:
         Executes a 'God Mode' full mission: Scan -> Buy -> Wait -> Sell.
         Uses REAL Scanner and REAL Execution Engine logic, but enforces a profit for demo.
         """
+        import logging
+        logger = logging.getLogger("ORCHESTRATOR")
+        
         # prevent double run concurrency logic if needed, but for now simple check
-        if getattr(self, '_loop_lock', False): return
+        if getattr(self, '_loop_lock', False): 
+            logger.warning("⚠️  Mission already running, skipping concurrent execution")
+            return
         self._loop_lock = True
 
         try:
-            if not self.is_running: return
+            logger.info("🎯 MISSION START REQUESTED")
+            print("\\n" + "="*60)
+            print("🎯 run_demonstration_mission() CALLED")
+            print(f"   is_running = {self.is_running}")
+            print("="*60)
+            
+            if not self.is_running:
+                logger.info("⏸️  AI is OFFLINE. Mission aborted.")
+                print("   ⏸️  AI is OFFLINE. Skipping mission execution.")
+                return
+
+            logger.info("✅ AI is ONLINE. Starting mission execution...")
+            print("   ✅ AI is ONLINE. Proceeding with mission...\\n")
 
             log_event("MISSION START: Initializing Neural Core...", "INFO")
             await self.broadcast("MISSION_START", {"message": "Starting New Cycle..."})
             await asyncio.sleep(0.1)
 
             # 1. SCAN
+            logger.info("🔍 SCANNING: Broadcasting scan protocol...")
             log_event("SCANNING GLOBAL LEDGER (Binance/Bybit)...", "INFO")
             await self.broadcast("SCANNING", {"message": "Broadcasting Scan Protocol..."})
             
             # Simulate detailed scanning for UI visualization
             mock_scan_list = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "XRP/USDT", "ADA/USDT", "AVAX/USDT"]
             for asset in mock_scan_list:
-                if not self.is_running: return
+                if not self.is_running: 
+                    logger.info("⚠️  AI turned OFF during scan. Aborting.")
+                    return
                 await self.broadcast("SCAN_UPDATE", {
                     "symbol": asset, 
                     "status": "ANALYZING...", 
@@ -192,17 +160,21 @@ class Orchestrator:
 
             config = {"auto_pilot": False, "execution_enabled": True}
 
+            logger.info("📊 Running scanner.run()...")
             results = self.scanner.run(config)
             
             if not results:
+                logger.warning("⚠️  No targets found. Using fallback.")
                 log_event("No targets found. Forcing manual override.", "WARN")
                 best_pick = {"symbol": "SOL/USDT", "score": 92.5, "signal": "STRONG_BUY", "reason": "Forced Opportunity"}
             else:
                 best_pick = results[0]
+                logger.info(f"✅ Scanner found target: {best_pick}")
 
             symbol = best_pick['symbol']
             score = best_pick.get('score', 80)
             
+            logger.info(f"🎯 TARGET ACQUIRED: {symbol} (Score: {score})")
             log_event(f"TARGET ACQUIRED: {symbol} (Score: {score})", "SUCCESS")
             await self.broadcast("TARGET_ACQUIRED", {"symbol": symbol, "score": score, "message": f"Target Acquired: {symbol}"})
             await asyncio.sleep(0.5)
@@ -216,6 +188,7 @@ class Orchestrator:
             if not self.is_running: return
             
             # 2. EXECUTE BUY
+            logger.info(f"💰 EXECUTING BUY: {symbol}")
             log_event(f"EXECUTING ENTRY: BUY {symbol}...", "TRADE")
             await self.broadcast("EXECUTING", {"symbol": symbol, "message": f"Executing: {symbol}"})
             
@@ -227,9 +200,11 @@ class Orchestrator:
             if res.get('status') == 'FILLED':
                 entry_price = res.get('avg_price')
                 trade_qty = 100 / entry_price
+                logger.info(f"✅ ORDER FILLED: {symbol} @ ${entry_price:.2f}")
                 log_event(f"ORDER FILLED: {symbol} @ {entry_price:.2f}", "SUCCESS")
                 await self.broadcast("ORDER_FILLED", {"symbol": symbol, "price": entry_price, "message": f"Filled: {symbol} @ ${entry_price:.2f}"})
             else:
+                logger.error("❌ Execution Failed. Aborting cycle.")
                 log_event("Execution Failed. Aborting Cycle.", "ERROR")
                 await self.broadcast("ERROR", {"message": "Execution Failed"})
                 await asyncio.sleep(5) # Cooldown before retry
@@ -240,8 +215,10 @@ class Orchestrator:
 
             if not self.is_running:
                  self.execution_engine.close_position(symbol, {'entry': entry_price, 'size': trade_qty}, entry_price, reason="MANUAL_STOP")
+                 logger.info("⚠️  AI turned OFF. Position closed.")
                  return
 
+            logger.info("👀 MONITORING position...")
             log_event("MONITORING POSITION... Trailing Stop Active", "INFO")
             await self.broadcast("MONITORING", {"message": "Monitoring Position..."})
             await asyncio.sleep(1)
@@ -259,6 +236,7 @@ class Orchestrator:
                  return
             
             # 4. SELL
+            logger.info("🎯 TARGET REACHED. Closing position...")
             log_event("TARGET REACHED. CLOSING POSITION.", "TRADE")
             await self.broadcast("CLOSING", {"message": "Target Reached. Closing..."})
             
@@ -268,6 +246,7 @@ class Orchestrator:
             self.execution_engine.close_position(symbol, position_data, exit_price, reason="MISSION_COMPLETE")
             
             profit = (exit_price - entry_price) * trade_qty
+            logger.info(f"✅ MISSION COMPLETE. NET PROFIT: +${profit:.2f}")
             log_event(f"MISSION COMPLETE. NET PROFIT: +${profit:.2f}", "SUCCESS")
             
             await self.broadcast("MISSION_COMPLETE", {"message": "Cycle Complete"})
@@ -281,10 +260,14 @@ class Orchestrator:
             })
 
             # Cooldown between missions
+            logger.info("😴 COOLDOWN: Analyzing Next Opportunities...")
             log_event("COOLDOWN: Analyzing Next Opportunities...", "INFO")
             
         except Exception as e:
+            logger.error(f"🔥 CRITICAL MISSION ERROR: {e}")
             log_event(f"CRITICAL LOOP ERROR: {e}", "ERROR")
+            import traceback
+            traceback.print_exc()
         finally:
             self._loop_lock = False
-            # log_event("MISSION ENDED", "DEBUG")
+            logger.info("🏁 Mission ended. Lock released.")

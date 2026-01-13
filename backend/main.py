@@ -56,18 +56,42 @@ orchestrator = Orchestrator(mode="PAPER", ai_core=ai_core)
 # =====================================================
 async def trading_background_loop():
     """
-    Infinite loop running in background.
+    Infinite loop running in background. Continuously monitors and executes trading cycles.
     """
+    import logging
+    logger = logging.getLogger("TRADING_LOOP")
+    
     print(" 🚀 STARTING BACKGROUND TRADING LOOP...")
-    orchestrator.is_running = True
-    while orchestrator.is_running:
+    print(f" ℹ️  Initial orchestrator.is_running: {orchestrator.is_running}")
+    logger.info(" 🚀 Background Trading Loop Started")
+    
+    heartbeat_counter = 0
+    
+    while True:  # Loop runs forever
         try:
-            # We pass current config to the cycle if needed, but orchestrator currently handles its own logic.
-            # In V3 this might call run(AI_CONFIG)
-            orchestrator.run_cycle()
+            # HEARTBEAT EVERY 10 SECONDS
+            heartbeat_counter += 1
+            current_time = datetime.now().strftime('%H:%M:%S')
+            
+            logger.info(f" ❤️  AI LOOP ALIVE | Heartbeat #{heartbeat_counter} | Time: {current_time} | Status: {'ONLINE' if orchestrator.is_running else 'STANDBY'}")
+            print(f"\n⏰ [LOOP HEARTBEAT #{heartbeat_counter}] Time: {current_time}")
+            print(f"   📊 AI Status: {'🟢 ONLINE' if orchestrator.is_running else '🔴 STANDBY'}")
+            print(f"   🔧 orchestrator.is_running = {orchestrator.is_running}")
+            print(f"   🎯 About to call orchestrator.run_cycle()...")
+            
+            # Call async run_cycle which checks is_running internally
+            await orchestrator.run_cycle()
+            
+            logger.info(f" ✅ Cycle completed. Waiting 10 seconds...")
+            print(f"   ✅ Cycle completed successfully.\n")
+            
         except Exception as e:
-            print(f"  ORCHESTRATOR ERROR: {e}")
-        await asyncio.sleep(60) # Cycle every 1 minute for now
+            logger.error(f" ❌ ORCHESTRATOR ERROR: {e}")
+            print(f"  ❌ ORCHESTRATOR ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        await asyncio.sleep(10)  # HEARTBEAT EVERY 10 SECONDS
 
 @app.on_event("startup")
 async def startup_event():

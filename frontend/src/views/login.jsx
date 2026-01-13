@@ -148,33 +148,8 @@ const Login = () => {
     setLoading(false);
   };
 
-  const s = {
-    wrapper: {
-      minHeight: '100vh', width: '100%', position: 'relative', background: '#020202', display: 'flex', flexDirection: 'column', overflowX: 'hidden',
-      fontFamily: "'Outfit', sans-serif"
-    },
-    nav: {
-      padding: '32px 60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, position: 'absolute', width: '100%'
-    },
-    logoContainer: {
-      display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer'
-    },
-    title: {
-      fontSize: 'clamp(4rem, 12vw, 7.5rem)', fontWeight: '800', lineHeight: '0.95', marginBottom: '40px', zIndex: 1,
-      color: '#fff', letterSpacing: '-2px'
-    },
-    windowCard: {
-      height: '500px', padding: '48px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', position: 'relative',
-      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '32px', backdropFilter: 'blur(20px)'
-    },
-    authSidebar: {
-      position: 'fixed', right: showAuth ? '0' : '-100%', top: 0, width: '100%', maxWidth: '520px', height: '100vh', zIndex: 100, padding: '60px 40px', display: 'flex', flexDirection: 'column', transition: 'right 0.6s cubic-bezier(0.16, 1, 0.3, 1)', borderLeft: '1px solid rgba(255,255,255,0.1)', boxShadow: '-40px 0 80px rgba(0,0,0,0.9)', background: 'rgba(5, 5, 5, 0.85)', backdropFilter: 'blur(40px)',
-      overflowY: 'auto'
-    }
-  };
-
   return (
-    <div style={s.wrapper}>
+    <div className="min-h-screen w-full relative flex flex-col overflow-x-hidden">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
         html { scroll-behavior: smooth; }
@@ -186,15 +161,60 @@ const Login = () => {
             text-shadow: 0 20px 80px rgba(255,255,255,0.15);
         }
         
-        .glass-panel {
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(20px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        @keyframes tickerScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        
+        /* COIN CARD CONTAINER - PREVENT OVERFLOW */
+        .coin-card-container {
+          position: relative;
+          overflow: hidden;
+          width: 100%;
+          height: 100%;
         }
         
-        @keyframes tickerScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        .window-bg-icon { position: absolute; top: -20px; right: -20px; opacity: 0.03; font-size: 200px; transform: rotate(-15deg); }
+        /* TEXT CONTENT CENTERING */
+        .coin-card-text {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          text-align: center;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          z-index: 2;
+        }
+        
+        /* RESPONSIVE CARD TITLES */
+        .coin-card-title {
+          font-size: clamp(1.5rem, 3vw, 2rem);
+          font-weight: 800;
+          margin-bottom: 12px;
+          line-height: 1.2;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          width: 100%;
+        }
+        
+        /* RESPONSIVE CARD TEXT */
+        .coin-card-description {
+          font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+          line-height: 1.6;
+          color: var(--text-dim);
+          overflow: hidden;
+          width: 100%;
+        }
+        
+        /* BACKGROUND ICON POSITIONING */
+        .window-bg-icon { 
+          position: absolute; 
+          top: -20px; 
+          right: -20px; 
+          opacity: 0.03; 
+          font-size: 200px; 
+          transform: rotate(-15deg);
+          pointer-events: none;
+          z-index: 0;
+        }
 
         /* SCI-FI HOLO EFFECTS */
         @keyframes scan { 
@@ -205,25 +225,25 @@ const Login = () => {
         }
         .laser-scan {
             position: absolute; left: 0; width: 100%; height: 2px;
-            background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
-            box-shadow: 0 0 10px var(--accent-gold);
+            background: linear-gradient(90deg, transparent, var(--neon-gold), transparent);
+            box-shadow: 0 0 10px var(--neon-gold);
             animation: scan 3s linear infinite;
             z-index: 10;
         }
         
         @keyframes pulse-dot { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(3); opacity: 0; } }
         .pulse-marker {
-            position: absolute; width: 8px; height: 8px; background: var(--accent-gold); borderRadius: 50%;
+            position: absolute; width: 8px; height: 8px; background: var(--neon-gold); borderRadius: 50%;
         }
         .pulse-ring {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            border: 1px solid var(--accent-gold); borderRadius: 50%;
+            border: 1px solid var(--neon-gold); borderRadius: 50%;
             animation: pulse-dot 2s infinite ease-out;
         }
         
         .glitch-text:hover {
             animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite;
-            color: var(--accent-gold);
+            color: var(--neon-gold);
         }
         @keyframes glitch {
             0% { transform: translate(0) }
@@ -233,23 +253,14 @@ const Login = () => {
             80% { transform: translate(2px, -2px) }
             100% { transform: translate(0) }
         }
-        
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .animate-spin { animation: spin 1s linear infinite; }
-
-        /* CUSTOM SCROLLBAR */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #050505; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--accent-gold); }
 
         /* SHIMMER BUTTON EFFECT */
         .shimmer-btn {
           position: relative;
           overflow: hidden;
           background: rgba(0,0,0,0.5);
-          border: 1px solid var(--accent-gold);
-          color: var(--accent-gold);
+          border: 1px solid var(--neon-gold);
+          color: var(--neon-gold);
           transition: all 0.3s ease;
         }
         .shimmer-btn::before {
@@ -271,15 +282,7 @@ const Login = () => {
         /* TEXT REVEAL */
         @keyframes reveal { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
         .reveal-text { animation: reveal 1s ease forwards; }
-
-        .glass-panel {
-            background: rgba(10, 10, 12, 0.4); /* Darker for contrast */
-            backdrop-filter: blur(24px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.05); /* Subtler border */
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-        }
       `}</style>
-      import Scene3D from '../components/Scene3D';
 
       {/* BACKGROUND SCENE */}
       <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0, overflow: 'hidden' }}>
@@ -287,18 +290,15 @@ const Login = () => {
           initial={{ scale: 1.1, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 1.5 }}
-          style={{
-            width: '100%', height: '100%',
-            background: 'radial-gradient(circle at 50% 50%, #1a1a2e 0%, #000 100%)', // Fallback
-          }}
+          style={{ width: '100%', height: '100%' }}
         >
           <Scene3D />
         </motion.div>
       </div>
 
       {/* --- NAVIGATION --- */}
-      <nav style={s.nav}>
-        <div style={s.logoContainer} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+      <nav className="glass-panel" style={{ padding: '32px 60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, position: 'absolute', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer' }} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
           <img src="/assets/logo_main.jpg" alt="Redline Logo" style={{ height: '40px', borderRadius: '8px' }} />
           <span style={{ fontSize: '18px', fontWeight: '700', letterSpacing: '1px', color: '#fff' }}>REDLINE</span>
         </div>
@@ -311,37 +311,47 @@ const Login = () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           className="glass-panel"
-          style={{
-            padding: '14px 36px', borderRadius: '100px', fontSize: '14px', zIndex: 20, color: '#fff', fontWeight: '600', cursor: 'pointer'
-          }}
+          style={{ padding: '14px 36px', borderRadius: '100px', fontSize: '14px', zIndex: 20, color: '#fff', fontWeight: '600', cursor: 'pointer' }}
         >
           Operator Login
         </motion.button>
       </nav>
 
       {/* --- HERO SECTION --- */}
-      <section style={s.hero}>
+      <section style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 40px', position: 'relative', zIndex: 1 }}>
         <motion.div
           initial={{ y: 40, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', maxWidth: '1200px', width: '100%', textAlign: 'center' }}
+          className="glass-panel"
+          style={{
+            zIndex: 10,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            maxWidth: '1200px',
+            width: '100%',
+            textAlign: 'center',
+            padding: '60px 40px',
+            background: 'rgba(10, 10, 12, 0.3)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.05)'
+          }}
         >
           {/* TITLE */}
-          <h1 style={{ ...s.title, textAlign: 'center', width: '100%', marginBottom: '24px' }} className="hero-title-gradient">
-            Trade the <br /><span style={{ color: 'var(--accent-gold)', WebkitTextFillColor: 'initial' }}>Invisible</span>.
+          <h1 style={{ fontSize: 'clamp(4rem, 12vw, 7.5rem)', fontWeight: '800', lineHeight: '0.95', marginBottom: '24px', letterSpacing: '-2px', textAlign: 'center', width: '100%' }} className="hero-title-gradient">
+            Trade the <br /><span style={{ color: 'var(--neon-gold)', WebkitTextFillColor: 'initial' }}>Invisible</span>.
           </h1>
 
-          {/* BADGE (Moved Below) */}
-          <div className="glass-panel" style={{
-            padding: '12px 28px', borderRadius: '100px', fontSize: '13px', color: 'var(--accent-gold)', fontWeight: '700', marginBottom: '40px', letterSpacing: '3px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '10px'
-          }}>
-            <span style={{ width: '8px', height: '8px', background: 'var(--accent-gold)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent-gold)' }}></span>
+          {/* BADGE */}
+          <div className="glass-panel" style={{ padding: '12px 28px', borderRadius: '100px', fontSize: '13px', color: 'var(--neon-gold)', fontWeight: '700', marginBottom: '40px', letterSpacing: '3px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0,0,0,0.5)' }}>
+            <span style={{ width: '8px', height: '8px', background: 'var(--neon-gold)', borderRadius: '50%', boxShadow: '0 0 10px var(--neon-gold)' }}></span>
             Institutional AI Core
           </div>
 
           {/* DESCRIPTION */}
-          <div className="glass-panel" style={{ padding: '30px', borderRadius: '24px', marginBottom: '56px', maxWidth: '800px', width: '90%' }}>
+          <div className="glass-panel" style={{ padding: '30px', borderRadius: '24px', marginBottom: '56px', maxWidth: '800px', width: '90%', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }}>
             <p style={{ fontSize: '20px', color: 'rgba(255,255,255,0.9)', lineHeight: '1.6', fontWeight: '400', margin: 0, textAlign: 'center' }}>
               Unleash the power of Neural Regime Detection. Our AI extracts signal from chaos, executing with millisecond precision in any market condition.
             </p>
@@ -354,9 +364,7 @@ const Login = () => {
               whileTap={{ scale: 0.95 }}
               onClick={() => { setShowAuth(true); setAuthTab('request'); }}
               className="shimmer-btn glass-panel"
-              style={{
-                padding: '16px 40px', fontSize: '16px', borderRadius: '100px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
-              }}
+              style={{ padding: '16px 40px', fontSize: '16px', borderRadius: '100px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
             >
               Request Access
             </motion.button>
@@ -364,10 +372,7 @@ const Login = () => {
               whileHover={{ scale: 1.05, background: 'rgba(255,255,255,0.15)' }}
               whileTap={{ scale: 0.95 }}
               className="glass-panel"
-              style={{
-                padding: '16px 40px', borderRadius: '100px', color: '#fff', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
-                border: '1px solid rgba(255,255,255,0.2)'
-              }}
+              style={{ padding: '16px 40px', borderRadius: '100px', color: '#fff', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid rgba(255,255,255,0.2)' }}
               onClick={() => document.getElementById('three-windows').scrollIntoView({ behavior: 'smooth' })}
             >
               Tech Stack <ChevronRight size={18} />
@@ -383,7 +388,7 @@ const Login = () => {
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '15px', fontSize: '15px', fontWeight: '700' }}>
               <span style={{ color: 'var(--text-dim)', opacity: 0.6 }}>{c.symbol}</span>
               <span style={{ color: '#fff' }}>${c.price}</span>
-              <span style={{ color: c.change.includes('+') ? '#00e676' : '#ff3d00', textShadow: `0 0 10px ${c.change.includes('+') ? 'rgba(0,e6,118,0.3)' : 'rgba(255,61,0,0.3)'}` }}>{c.change}</span>
+              <span style={{ color: c.change.includes('+') ? '#00e676' : '#ff3d00', textShadow: `0 0 10px ${c.change.includes('+') ? 'rgba(0,230,118,0.3)' : 'rgba(255,61,0,0.3)'}` }}>{c.change}</span>
             </div>
           ))}
         </div>
@@ -392,27 +397,23 @@ const Login = () => {
       {/* --- THE THREE COINS (3D INTERACTIVE) --- */}
       <section id="three-windows" style={{ padding: '140px 0', position: 'relative' }}>
         <div style={{ position: 'absolute', top: '10%', left: '5%', opacity: 0.05, filter: 'blur(100px)', zIndex: 0 }}>
-          <div style={{ width: '400px', height: '400px', borderRadius: '50%', background: 'var(--accent-gold)' }} />
+          <div style={{ width: '400px', height: '400px', borderRadius: '50%', background: 'var(--neon-gold)' }} />
         </div>
         <h2 style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)', fontWeight: '800', marginBottom: '64px', textAlign: 'center', position: 'relative', zIndex: 1 }}>
-          The <span style={{ color: 'var(--accent-gold)' }}>Redline</span> Advantage
+          The <span style={{ color: 'var(--neon-gold)' }}>Redline</span> Advantage
         </h2>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '40px', padding: '0 40px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
 
           {/* BTC CARD */}
-          <div className="coin-card-container" style={{ position: 'relative', height: '500px', cursor: 'pointer' }}>
+          <div className="coin-card-container" style={{ position: 'relative', height: '500px', cursor: 'pointer', overflow: 'hidden' }}>
             <motion.div
               initial="initial"
               whileHover="hover"
               style={{ position: 'relative', width: '100%', height: '100%' }}
             >
-              {/* COIN STATE */}
               <motion.div
-                variants={{
-                  initial: { opacity: 1, scale: 1, rotateY: 0 },
-                  hover: { opacity: 0, scale: 0.8, rotateY: 180 }
-                }}
+                variants={{ initial: { opacity: 1, scale: 1, rotateY: 0 }, hover: { opacity: 0, scale: 0.8, rotateY: 180 } }}
                 transition={{ duration: 0.4 }}
                 style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
               >
@@ -425,23 +426,28 @@ const Login = () => {
                 />
               </motion.div>
 
-              {/* INFO STATE */}
               <motion.div
-                variants={{
-                  initial: { opacity: 0, scale: 0.8, rotateY: -180 },
-                  hover: { opacity: 1, scale: 1, rotateY: 0 }
-                }}
+                variants={{ initial: { opacity: 0, scale: 0.8, rotateY: -180 }, hover: { opacity: 1, scale: 1, rotateY: 0 } }}
                 transition={{ duration: 0.4 }}
                 className="glass-panel"
                 style={{
-                  position: 'absolute', inset: 0, zIndex: 1, borderRadius: '32px', padding: '48px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-                  background: 'rgba(20, 20, 20, 0.8)', border: '1px solid var(--accent-gold)'
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 1,
+                  borderRadius: '32px',
+                  padding: '40px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'flex-end',
+                  background: 'rgba(20, 20, 20, 0.8)',
+                  border: '1px solid var(--neon-gold)',
+                  overflow: 'hidden'
                 }}
               >
                 <Radar className="window-bg-icon" />
-                <Target size={44} color="var(--accent-gold)" style={{ marginBottom: '28px' }} />
-                <h3 style={{ fontSize: '32px', marginBottom: '16px', fontWeight: '800' }}>Neural Scanner</h3>
-                <p style={{ color: 'var(--text-dim)', fontSize: '17px', lineHeight: '1.7' }}>
+                <Target size={44} color="var(--neon-gold)" style={{ marginBottom: '20px' }} />
+                <h3 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', marginBottom: '12px', fontWeight: '800' }}>Neural Scanner</h3>
+                <p style={{ color: 'var(--text-dim)', fontSize: 'clamp(0.9rem, 1.5vw, 1.1rem)', lineHeight: '1.6' }}>
                   Proprietary MQS algorithms scan the global order book. We detect institutional footprints before they trigger momentum.
                 </p>
               </motion.div>
@@ -449,18 +455,10 @@ const Login = () => {
           </div>
 
           {/* ETH CARD */}
-          <div className="coin-card-container" style={{ position: 'relative', height: '500px', cursor: 'pointer' }}>
-            <motion.div
-              initial="initial"
-              whileHover="hover"
-              style={{ position: 'relative', width: '100%', height: '100%' }}
-            >
-              {/* COIN STATE */}
+          <div className="coin-card-container" style={{ position: 'relative', height: '500px', cursor: 'pointer', overflow: 'hidden' }}>
+            <motion.div initial="initial" whileHover="hover" style={{ position: 'relative', width: '100%', height: '100%' }}>
               <motion.div
-                variants={{
-                  initial: { opacity: 1, scale: 1, rotateY: 0 },
-                  hover: { opacity: 0, scale: 0.8, rotateY: 180 }
-                }}
+                variants={{ initial: { opacity: 1, scale: 1, rotateY: 0 }, hover: { opacity: 0, scale: 0.8, rotateY: 180 } }}
                 transition={{ duration: 0.4 }}
                 style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
               >
@@ -473,23 +471,16 @@ const Login = () => {
                 />
               </motion.div>
 
-              {/* INFO STATE */}
               <motion.div
-                variants={{
-                  initial: { opacity: 0, scale: 0.8, rotateY: -180 },
-                  hover: { opacity: 1, scale: 1, rotateY: 0 }
-                }}
+                variants={{ initial: { opacity: 0, scale: 0.8, rotateY: -180 }, hover: { opacity: 1, scale: 1, rotateY: 0 } }}
                 transition={{ duration: 0.4 }}
                 className="glass-panel"
-                style={{
-                  position: 'absolute', inset: 0, zIndex: 1, borderRadius: '32px', padding: '48px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-                  background: 'rgba(20, 20, 20, 0.8)', border: '1px solid #7c4dff'
-                }}
+                style={{ position: 'absolute', inset: 0, zIndex: 1, borderRadius: '32px', padding: '40px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'rgba(20, 20, 20, 0.8)', border: '1px solid #7c4dff', overflow: 'hidden' }}
               >
                 <Cpu className="window-bg-icon" />
-                <Activity size={44} color="#7c4dff" style={{ marginBottom: '28px' }} />
-                <h3 style={{ fontSize: '32px', marginBottom: '16px', fontWeight: '800', color: '#7c4dff' }}>AI Execution</h3>
-                <p style={{ color: 'var(--text-dim)', fontSize: '17px', lineHeight: '1.7' }}>
+                <Activity size={44} color="#7c4dff" style={{ marginBottom: '20px' }} />
+                <h3 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', marginBottom: '12px', fontWeight: '800', color: '#7c4dff' }}>AI Execution</h3>
+                <p style={{ color: 'var(--text-dim)', fontSize: 'clamp(0.9rem, 1.5vw, 1.1rem)', lineHeight: '1.6' }}>
                   Dynamic risk management powered by Monte Carlo logic. We only execute when the probability density favors your capital.
                 </p>
               </motion.div>
@@ -497,18 +488,10 @@ const Login = () => {
           </div>
 
           {/* SOL CARD */}
-          <div className="coin-card-container" style={{ position: 'relative', height: '500px', cursor: 'pointer' }}>
-            <motion.div
-              initial="initial"
-              whileHover="hover"
-              style={{ position: 'relative', width: '100%', height: '100%' }}
-            >
-              {/* COIN STATE */}
+          <div className="coin-card-container" style={{ position: 'relative', height: '500px', cursor: 'pointer', overflow: 'hidden' }}>
+            <motion.div initial="initial" whileHover="hover" style={{ position: 'relative', width: '100%', height: '100%' }}>
               <motion.div
-                variants={{
-                  initial: { opacity: 1, scale: 1, rotateY: 0 },
-                  hover: { opacity: 0, scale: 0.8, rotateY: 180 }
-                }}
+                variants={{ initial: { opacity: 1, scale: 1, rotateY: 0 }, hover: { opacity: 0, scale: 0.8, rotateY: 180 } }}
                 transition={{ duration: 0.4 }}
                 style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
               >
@@ -521,23 +504,16 @@ const Login = () => {
                 />
               </motion.div>
 
-              {/* INFO STATE */}
               <motion.div
-                variants={{
-                  initial: { opacity: 0, scale: 0.8, rotateY: -180 },
-                  hover: { opacity: 1, scale: 1, rotateY: 0 }
-                }}
+                variants={{ initial: { opacity: 0, scale: 0.8, rotateY: -180 }, hover: { opacity: 1, scale: 1, rotateY: 0 } }}
                 transition={{ duration: 0.4 }}
                 className="glass-panel"
-                style={{
-                  position: 'absolute', inset: 0, zIndex: 1, borderRadius: '32px', padding: '48px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-                  background: 'rgba(20, 20, 20, 0.8)', border: '1px solid #00e676'
-                }}
+                style={{ position: 'absolute', inset: 0, zIndex: 1, borderRadius: '32px', padding: '40px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'rgba(20, 20, 20, 0.8)', border: '1px solid #00e676', overflow: 'hidden' }}
               >
                 <ShieldCheck className="window-bg-icon" />
-                <Zap size={44} color="#00e676" style={{ marginBottom: '28px' }} />
-                <h3 style={{ fontSize: '32px', marginBottom: '16px', fontWeight: '800', color: '#00e676' }}>Competitive Edge</h3>
-                <p style={{ color: 'var(--text-dim)', fontSize: '17px', lineHeight: '1.7' }}>
+                <Zap size={44} color="#00e676" style={{ marginBottom: '20px' }} />
+                <h3 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', marginBottom: '12px', fontWeight: '800', color: '#00e676' }}>Competitive Edge</h3>
+                <p style={{ color: 'var(--text-dim)', fontSize: 'clamp(0.9rem, 1.5vw, 1.1rem)', lineHeight: '1.6' }}>
                   While others follow lag indicators, Redline predicts regime shifts. Non-custodial, lightning-fast, and battle-tested.
                 </p>
               </motion.div>
@@ -554,27 +530,24 @@ const Login = () => {
             <h2 style={{ fontSize: '40px', fontWeight: '800', marginBottom: '16px' }}>Market Brain</h2>
             <p style={{ color: 'var(--text-dim)', fontSize: '18px' }}>Watch the AI process raw volatility into actionable intelligence.</p>
           </div>
-          <div className="glass" style={{ padding: '16px 32px', fontSize: '14px', fontWeight: '800', color: 'var(--accent-gold)', border: '1px solid rgba(226,183,20,0.2)' }}>
+          <div className="glass-panel" style={{ padding: '16px 32px', fontSize: '14px', fontWeight: '800', color: 'var(--neon-gold)', border: '1px solid rgba(226,183,20,0.2)' }}>
             ACCURACY INDEX: 92.8%
           </div>
         </div>
-        <div className="glass depth-3d" style={{ padding: '40px', height: '500px', borderRadius: '24px', position: 'relative', overflow: 'hidden', background: 'rgba(0,0,0,0.3)' }}>
+        <div className="glass-panel" style={{ padding: '40px', height: '500px', borderRadius: '24px', position: 'relative', overflow: 'hidden', background: 'rgba(0,0,0,0.3)' }}>
           <div className="laser-scan" />
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={aiLogicData}>
               <defs>
-                <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--accent-gold)" stopOpacity={0.4} /><stop offset="95%" stopColor="var(--accent-gold)" stopOpacity={0} /></linearGradient>
-                <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--accent-blue)" stopOpacity={0.3} /><stop offset="95%" stopColor="var(--accent-blue)" stopOpacity={0} /></linearGradient>
+                <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--neon-gold)" stopOpacity={0.4} /><stop offset="95%" stopColor="var(--neon-gold)" stopOpacity={0} /></linearGradient>
+                <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--neon-blue)" stopOpacity={0.3} /><stop offset="95%" stopColor="var(--neon-blue)" stopOpacity={0} /></linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis dataKey="time" stroke="var(--text-dim)" fontSize={12} axisLine={false} tickLine={false} />
               <YAxis stroke="var(--text-dim)" fontSize={12} axisLine={false} tickLine={false} />
-              <Tooltip
-                contentStyle={{ background: 'rgba(10,10,12,0.95)', border: '1px solid var(--glass-border)', borderRadius: '12px', color: '#fff' }}
-                itemStyle={{ color: '#fff' }}
-              />
-              <Area type="monotone" dataKey="filtered" stroke="var(--accent-gold)" fill="url(#g1)" strokeWidth={3} activeDot={{ r: 6 }} />
-              <Area type="monotone" dataKey="confidence" stroke="var(--accent-blue)" fill="url(#g2)" strokeWidth={2} />
+              <Tooltip contentStyle={{ background: 'rgba(10,10,12,0.95)', border: '1px solid var(--glass-border)', borderRadius: '12px', color: '#fff' }} itemStyle={{ color: '#fff' }} />
+              <Area type="monotone" dataKey="filtered" stroke="var(--neon-gold)" fill="url(#g1)" strokeWidth={3} activeDot={{ r: 6 }} />
+              <Area type="monotone" dataKey="confidence" stroke="var(--neon-blue)" fill="url(#g2)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -601,12 +574,12 @@ const Login = () => {
         />
       )}
 
-      <div style={s.authSidebar} className="fade-in" ref={sidebarRef}>
+      <div className="glass-panel fade-in" style={{ position: 'fixed', right: showAuth ? '0' : '-100%', top: 0, width: '100%', maxWidth: '520px', height: '100vh', zIndex: 100, padding: '60px 40px', display: 'flex', flexDirection: 'column', transition: 'right 0.6s cubic-bezier(0.16, 1, 0.3, 1)', borderLeft: '1px solid rgba(255,255,255,0.1)', boxShadow: '-40px 0 80px rgba(0,0,0,0.9)', background: 'rgba(5, 5, 5, 0.85)', backdropFilter: 'blur(40px)', overflowY: 'auto' }} ref={sidebarRef}>
         <button style={{ position: 'absolute', right: '32px', top: '32px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '28px' }} onClick={() => setShowAuth(false)}>&times;</button>
 
         <div style={{ display: 'flex', marginBottom: '56px', gap: '40px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ padding: '16px 0', fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: authTab === 'login' ? 'var(--accent-gold)' : 'var(--text-dim)', borderBottom: `2px solid ${authTab === 'login' ? 'var(--accent-gold)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => { setAuthTab('login'); if (sidebarRef.current) sidebarRef.current.scrollTop = 0; }}>Terminal</div>
-          <div style={{ padding: '16px 0', fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: authTab === 'request' ? 'var(--accent-gold)' : 'var(--text-dim)', borderBottom: `2px solid ${authTab === 'request' ? 'var(--accent-gold)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => { setAuthTab('request'); if (sidebarRef.current) sidebarRef.current.scrollTop = 0; }}>Inquiry</div>
+          <div style={{ padding: '16px 0', fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: authTab === 'login' ? 'var(--neon-gold)' : 'var(--text-dim)', borderBottom: `2px solid ${authTab === 'login' ? 'var(--neon-gold)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => { setAuthTab('login'); if (sidebarRef.current) sidebarRef.current.scrollTop = 0; }}>Terminal</div>
+          <div style={{ padding: '16px 0', fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: authTab === 'request' ? 'var(--neon-gold)' : 'var(--text-dim)', borderBottom: `2px solid ${authTab === 'request' ? 'var(--neon-gold)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => { setAuthTab('request'); if (sidebarRef.current) sidebarRef.current.scrollTop = 0; }}>Inquiry</div>
         </div>
 
         {authTab === 'login' ? (
@@ -634,10 +607,10 @@ const Login = () => {
           <form onSubmit={handleRequest} className="fade-in">
             {reqStatus.sent ? (
               <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                <CheckCircle size={80} color="var(--accent-gold)" style={{ marginBottom: '32px' }} />
+                <CheckCircle size={80} color="var(--neon-gold)" style={{ marginBottom: '32px' }} />
                 <h2 style={{ fontSize: '32px', fontWeight: '900', marginBottom: '16px' }}>Request Dispatched</h2>
                 <p style={{ color: 'var(--text-dim)', fontSize: '16px', lineHeight: '1.6' }}>We are vetting your credentials. Expect a secure response within 24 hours.</p>
-                <button onClick={() => setAuthTab('login')} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', padding: '16px 36px', borderRadius: '12px', color: '#fff', marginTop: '40px', cursor: 'pointer', fontWeight: '700' }}>Back to Terminal</button>
+                <button onClick={() => setAuthTab('login')} className="glass-panel" style={{ padding: '16px 36px', borderRadius: '12px', color: '#fff', marginTop: '40px', cursor: 'pointer', fontWeight: '700' }}>Back to Terminal</button>
               </div>
             ) : (
               <>
