@@ -1,0 +1,123 @@
+{
+    "name": "Redline Crypto Sentiment Agent",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "minutes",
+                            "minutesInterval": 15
+                        }
+                    ]
+                }
+            },
+            "name": "Schedule",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://cryptopanic.com/api/v1/posts/?auth_token=YOUR_API_KEY&kind=news",
+                "options": {}
+            },
+            "name": "Fetch Crypto News",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                450,
+                300
+            ],
+            "notes": "Replace YOUR_API_KEY with free CryptoPanic key"
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o-mini",
+                "prompt": "Analyze the sentiment of these news headlines for the crypto market. Return ONLY a JSON object: { \"sentiment\": <0-100 score, where 0 is bearish, 100 bullish>, \"summary\": \"<1 sentence summary>\" }.\n\nHeadlines: {{ $json.results.map(p => p.title).join('; ') }}"
+            },
+            "name": "Analyze Sentiment (LLM)",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ],
+            "notes": "You can use OpenAI or Anthropic node here"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://localhost:8000/api/webhooks/external_data",
+                "sendBody": true,
+                "contentType": "json",
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "source",
+                            "value": "n8n-news-agent"
+                        },
+                        {
+                            "name": "type",
+                            "value": "sentiment"
+                        },
+                        {
+                            "name": "value",
+                            "value": "={{ JSON.parse($json.text).sentiment }}"
+                        },
+                        {
+                            "name": "summary",
+                            "value": "={{ JSON.parse($json.text).summary }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Push to Redline Brain",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                850,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Schedule": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Crypto News",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Crypto News": {
+            "main": [
+                [
+                    {
+                        "node": "Analyze Sentiment (LLM)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Analyze Sentiment (LLM)": {
+            "main": [
+                [
+                    {
+                        "node": "Push to Redline Brain",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

@@ -1,0 +1,10 @@
+{
+    "min_confidence": 0.6,
+    "risk_mode": "BALANCED",
+    "sentiment_weight": 80.0,
+    "max_open_positions": 3,
+    "auto_trade_enabled": false,
+    "confirmation_required": true,
+    "volatility_filter": true,
+    "news_impact_enabled": true
+}

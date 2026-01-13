@@ -8,7 +8,7 @@ export const useEvents = (scope = "OPS") => {
   useEffect(() => {
      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host; // np. localhost:3000
-    
+
     const connect = () => {
       // Łączymy się z proxy (które przekieruje na backend 8000)
       ws.current = new WebSocket(`${protocol}//${host}/ws/events?scope=${scope}`);
@@ -20,11 +20,11 @@ export const useEvents = (scope = "OPS") => {
       ws.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+
           // Ignorujemy Heartbeat
           if (data.type !== 'HEARTBEAT') {
             console.log(" EVENT:", data);
-            
+
             // 2. Aktualizujemy stan (dodajemy nowe zdarzenie na górę listy)
             setEvents((prevEvents) => {
               // Trzymamy tylko ostatnie 50 zdarzeń, żeby nie zapchać pamięci

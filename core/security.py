@@ -18,7 +18,7 @@ class HardwareSecurity:
         """
         # Symulujemy chwilę "pracy" dla efektu UI
         time.sleep(0.8)
-        
+
         # W trybie PAPER/DEV zawsze zwracamy sukces, żebyś mógł się zalogować
         # W wersji LIVE tutaj byłby kod sprawdzający fizyczne dyski (e.g. win32api.GetLogicalDriveStrings)
         return True, "VIRTUAL_SECURE_DRIVE"

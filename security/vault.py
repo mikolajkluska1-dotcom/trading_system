@@ -8,7 +8,7 @@ class Vault:
     Moduł obronny: Szyfrowanie Portfela (AES-128 via Fernet).
     V3.1: Skonfigurowany pod Trading System (Startowe $10k).
     """
-    
+
     KEY_FILE = os.path.join("assets", "redline.key")
     WALLET_FILE = os.path.join("assets", "wallet.enc")
     DECOY_FILE = os.path.join("assets", "honeypot.txt")
@@ -22,7 +22,7 @@ class Vault:
     def _get_cipher():
         """Pobiera klucz. NIGDY nie generuje nowego, jeśli istnieje osierocony portfel."""
         Vault._ensure_assets_dir()
-        
+
         # --- CRITICAL SAFETY CHECK ---
         # Jeśli portfel istnieje, ale klucza brak -> STOP!
         if os.path.exists(Vault.WALLET_FILE) and not os.path.exists(Vault.KEY_FILE):
@@ -37,7 +37,7 @@ class Vault:
                     f.write(key)
             except Exception:
                 return None
-        
+
         try:
             with open(Vault.KEY_FILE, "rb") as f:
                 key = f.read()
@@ -53,7 +53,7 @@ class Vault:
             return {"balance": 0, "assets": [], "history": [], "LOCKED": True}
 
         cipher = Vault._get_cipher()
-        
+
         # Jeśli cipher jest None
         if cipher is None:
             return {"balance": 0, "assets": [], "ERROR": "FATAL_KEY_ERROR"}
@@ -62,14 +62,14 @@ class Vault:
         if not os.path.exists(Vault.WALLET_FILE):
             # --- ZMIANA TUTAJ: Dajemy $10,000 na start ---
             data = {
-                "balance": 10000.00, 
-                "assets": [], 
+                "balance": 10000.00,
+                "assets": [],
                 "history": [],
                 "LOCKED": False # Wymagane przez execution.py
             }
             Vault.save_wallet(data)
             return data
-            
+
         # 3. Próba deszyfracji
         try:
             with open(Vault.WALLET_FILE, "rb") as f:
@@ -93,10 +93,31 @@ class Vault:
         return False
 
     @staticmethod
+    def encrypt_string(plain_text: str) -> str:
+        """Szyfruje pojedynczy tekst."""
+        if not plain_text: return ""
+        cipher = Vault._get_cipher()
+        if cipher:
+            return cipher.encrypt(plain_text.encode()).decode()
+        return plain_text
+
+    @staticmethod
+    def decrypt_string(encrypted_text: str) -> str:
+        """Odszyfrowuje pojedynczy tekst."""
+        if not encrypted_text: return ""
+        cipher = Vault._get_cipher()
+        if cipher:
+            try:
+                return cipher.decrypt(encrypted_text.encode()).decode()
+            except Exception:
+                return encrypted_text # Zwracamy oryginał jeśli to nie zaszyfrowany tekst
+        return encrypted_text
+
+    @staticmethod
     def deploy_honeypot():
         Vault._ensure_assets_dir()
         try:
-            with open(Vault.DECOY_FILE, "w") as f: 
+            with open(Vault.DECOY_FILE, "w") as f:
                 f.write("root_user: admin\npass: 123456\nseed: apple banana cherry\nBTC_WALLET: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
             return True
         except:

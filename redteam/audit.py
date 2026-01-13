@@ -7,7 +7,7 @@ class RedTeamOps:
     def crack_hash(target_hash):
         """Prosty słownikowy łamacz haseł MD5"""
         dictionary = [
-            "admin", "123456", "password", "redline", 
+            "admin", "123456", "password", "redline",
             "root", "Cyber_Fortress_X1", "qwerty"
         ]
 

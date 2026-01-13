@@ -17,7 +17,7 @@ const Register = ({ onBack }) => {
       });
 
       const data = await res.json();
-      
+
       if (!res.ok) throw new Error(data.detail || 'Registration failed');
 
       setStatus({ loading: false, error: null, success: true });
@@ -52,7 +52,7 @@ const Register = ({ onBack }) => {
         <button onClick={onBack} style={{background:'none', border:'none', cursor:'pointer', marginBottom:'24px', display:'flex', alignItems:'center', gap:'5px', color:'#666', fontSize:'13px'}}>
           <ArrowLeft size={16} /> Back
         </button>
-        
+
         <h1 style={{fontSize:'24px', fontWeight:'700', marginBottom:'8px'}}>Join Redline</h1>
         <p style={{color:'#666', marginBottom:'32px', fontSize:'14px'}}>Submit access request for approval.</p>
 

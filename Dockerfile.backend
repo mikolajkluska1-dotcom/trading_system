@@ -1,0 +1,24 @@
+# Lekki obraz Pythona
+FROM python:3.10-slim
+
+# Ustawienie katalogu roboczego
+WORKDIR /app
+
+# Instalacja zależności systemowych (jeśli potrzebne dla TA-Lib lub innych)
+RUN apt-get update && apt-get install -y gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Kopiowanie requirements
+COPY requirements.txt .
+
+# Instalacja bibliotek Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Kopiowanie kodu aplikacji
+COPY . .
+
+# Port FastAPI
+EXPOSE 8000
+
+# Uruchomienie z watcherem (dla developmentu)
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

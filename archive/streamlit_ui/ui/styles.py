@@ -1,10 +1,8 @@
 import streamlit as st
 
-
 @st.cache_data
 def _render_css(css: str):
     st.markdown(css, unsafe_allow_html=True)
-
 
 def load_styles(
     mode: str = "ops",

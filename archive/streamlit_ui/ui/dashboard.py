@@ -18,7 +18,6 @@ from trading.decision import DecisionEngine
 from trading.execution import ExecutionEngine
 from trading.analytics import TradeAnalytics
 
-
 # =====================================================
 # UI HELPERS
 # =====================================================
@@ -37,10 +36,8 @@ def card_open(title: str = None):
         unsafe_allow_html=True,
     )
 
-
 def card_close():
     st.markdown("</div>", unsafe_allow_html=True)
-
 
 # =====================================================
 # MAIN DASHBOARD

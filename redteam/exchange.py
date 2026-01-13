@@ -30,7 +30,7 @@ class ExchangeSimulator:
         if roll < 0.30:
             # Wypełniamy od 10% do 50% zlecenia
             filled = qty * random.uniform(0.1, 0.5)
-            
+
             # Poślizg cenowy 0.2% - 1.0% (przeciwko nam)
             slippage = random.uniform(0.002, 0.010)
             if side == "BUY":

@@ -140,9 +140,7 @@ Root: C:\Users\user\Desktop\trading_system
         wallet.py
         __init__.py
 
-
 === FILE CONTENTS ===
-
 
 ==================================================
 FILE: reset.py
@@ -158,10 +156,10 @@ SALT = "X9vL2_REDLINE_STATIC_SALT"
 
 def fix_users_db():
     print(f"🔧 [1/2] Naprawianie bazy użytkowników (assets/users_db.json)...")
-    
+
     # Hashowanie hasła admina (Zwykłe SHA-256, bez soli - tak jak w ui/auth.py)
     admin_hash = hashlib.sha256(ADMIN_PASS.encode()).hexdigest()
-    
+
     db_structure = {
         "active": {
             "admin": {
@@ -172,22 +170,22 @@ def fix_users_db():
         },
         "pending": {}
     }
-    
+
     if not os.path.exists("assets"):
         os.makedirs("assets")
-        
+
     with open(os.path.join("assets", "users_db.json"), "w") as f:
         json.dump(db_structure, f, indent=4)
-        
+
     print(f"✅ Baza naprawiona. Login: admin | Hasło: {ADMIN_PASS}")
 
 def fix_config_hash():
     print(f"🔧 [2/2] Generowanie Hasha dla Configu...")
-    
+
     # Hashowanie Override Code (Hasło + Sól - tak jak w ui/auth.py sekcja Override)
     combined = OVERRIDE_PASS + SALT
     override_hash = hashlib.sha256(combined.encode()).hexdigest()
-    
+
     print("\n⚠️ SKOPIUJ PONIŻSZĄ LINIĘ DO PLIKU core/config.py:")
     print("-" * 60)
     print(f'SECURITY_OVERRIDE_HASH = "{override_hash}"')
@@ -207,7 +205,7 @@ OUTPUT_FILE = "redline_scan.txt"
 
 # Czego NIE chcemy skanować (śmieci)
 IGNORE_DIRS = {
-    'node_modules', '.git', '__pycache__', 'venv', '.venv', 'env', 
+    'node_modules', '.git', '__pycache__', 'venv', '.venv', 'env',
     'build', 'dist', '.vscode', '.idea'
 }
 # Jakie pliki nas interesują (kod)
@@ -215,7 +213,7 @@ INCLUDE_EXT = {'.py', '.js', '.jsx', '.json', '.css', '.html', '.md'}
 
 def scan_project():
     root_dir = os.getcwd()
-    
+
     with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
         f.write(f"=== REDLINE PROJECT SCAN ===\n")
         f.write(f"Root: {root_dir}\n\n")
@@ -225,35 +223,35 @@ def scan_project():
         for root, dirs, files in os.walk(root_dir):
             # Filtrowanie folderów
             dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
-            
+
             level = root.replace(root_dir, '').count(os.sep)
             indent = ' ' * 4 * (level)
             f.write(f"{indent}[{os.path.basename(root)}/]\n")
             subindent = ' ' * 4 * (level + 1)
             for file in files:
                 f.write(f"{subindent}{file}\n")
-        
+
         f.write("\n\n=== FILE CONTENTS ===\n")
 
         # 2. Zgrywamy treść plików kodu
         for root, dirs, files in os.walk(root_dir):
             dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
-            
+
             for file in files:
                 ext = os.path.splitext(file)[1].lower()
                 if ext in INCLUDE_EXT and file != "package-lock.json" and file != OUTPUT_FILE:
                     path = os.path.join(root, file)
                     rel_path = os.path.relpath(path, root_dir)
-                    
+
                     f.write(f"\n\n{'='*50}\n")
                     f.write(f"FILE: {rel_path}\n")
                     f.write(f"{'='*50}\n")
-                    
+
                     try:
                         with open(path, 'r', encoding='utf-8') as source:
                             content = source.read()
                             # Jeśli plik jest ogromny (np. baza danych json), utnij go
-                            if len(content) > 50000: 
+                            if len(content) > 50000:
                                 f.write("[CONTENT TOO LARGE - SKIPPED]\n")
                             else:
                                 f.write(content)
@@ -428,7 +426,6 @@ else:
     with tabs[4]:
         render_admin()
 
-
 ==================================================
 FILE: archive\streamlit_ui\ui\admin.py
 ==================================================
@@ -437,20 +434,20 @@ import pandas as pd
 from security.user_manager import UserManager
 
 def render_admin():
-    if st.session_state['sys']['role'] != "ROOT": 
+    if st.session_state['sys']['role'] != "ROOT":
         st.error("ACCESS DENIED")
         return
-        
+
     st.markdown("##### ADMIN PANEL")
     db = UserManager.load_db()
-    
+
     st.markdown("###### REQUESTS")
     for u in list(db.get('pending', {}).keys()):
         c1, c2, c3 = st.columns([3,1,1])
         c1.code(u)
         if c2.button("YES", key=f"y_{u}"): UserManager.approve_user(u, "TRADER"); st.rerun()
         if c3.button("NO", key=f"n_{u}"): UserManager.reject_user(u); st.rerun()
-        
+
     st.markdown("---")
     st.markdown("###### ACTIVE USERS")
     if db['active']:
@@ -464,7 +461,6 @@ import time
 
 from core.security import HardwareSecurity
 from security.user_manager import UserManager
-
 
 def render_auth():
     """
@@ -674,7 +670,6 @@ def render_auth():
             unsafe_allow_html=True,
         )
 
-
 ==================================================
 FILE: archive\streamlit_ui\ui\dashboard.py
 ==================================================
@@ -698,7 +693,6 @@ from trading.decision import DecisionEngine
 from trading.execution import ExecutionEngine
 from trading.analytics import TradeAnalytics
 
-
 # =====================================================
 # UI HELPERS
 # =====================================================
@@ -717,10 +711,8 @@ def card_open(title: str = None):
         unsafe_allow_html=True,
     )
 
-
 def card_close():
     st.markdown("</div>", unsafe_allow_html=True)
-
 
 # =====================================================
 # MAIN DASHBOARD
@@ -934,7 +926,6 @@ def render_dashboard():
 
     card_close()
 
-
 ==================================================
 FILE: archive\streamlit_ui\ui\hud.py
 ==================================================
@@ -961,7 +952,6 @@ def render_hud():
         <script>
         const hud = document.getElementById("hud-bar");
         const ws = new WebSocket("ws://127.0.0.1:8001/ws/hud");
-
 
         function color(v){
             if(v >= 80) return "#7f1d1d";
@@ -1000,7 +990,6 @@ def render_hud():
         height=56,
     )
 
-
 ==================================================
 FILE: archive\streamlit_ui\ui\scanner_view.py
 ==================================================
@@ -1013,47 +1002,47 @@ from core.config import THEMES
 def render_scanner_view():
     """Widok Skanera Rynku V5-PRO"""
     theme = THEMES[st.session_state['sys'].get('theme', 'MATRIX')]
-    
+
     st.markdown("###  DEEP FIELD SCANNER V5")
     st.caption("Pro-Grade Screening: HTF Trend + Regime Filter + Risk-Adjusted Scoring")
-    
+
     # Pasek narzędzi
     c1, c2, c3 = st.columns([1, 1, 2])
-    
+
     with c1:
         timeframe = st.selectbox("TIMEFRAME (LTF)", ["15m", "1h", "4h"], index=1, key="scan_tf")
-    
+
     with c2:
-        st.write("") 
-        st.write("") 
+        st.write("")
+        st.write("")
         # Przycisk uruchamia skanowanie
         run_btn = st.button(" SCAN TOP 50 LIQUID PAIRS", use_container_width=True)
-        
+
     # Logika Skanowania
     if run_btn:
         with st.status("RUNNING QUANTUM SCAN PROTOCOL...", expanded=True):
             st.write(" Fetching Market Data & Checking 4H HTF Trends...")
             st.write(" Calculating Market Regime (MQS) & Filtering Chop...")
             st.write(" DeepBrain Inference (Threshold > 60%)...")
-            
+
             # Uruchomienie skanera
             result_df = AutoRotator.run_scan(timeframe)
             st.session_state['scan_result'] = result_df
-            
+
             if not result_df.empty:
                 st.success(f"SCAN COMPLETE. Found {len(result_df)} opportunities.")
             else:
                 st.warning("NO OPPORTUNITIES FOUND (Market might be choppy).")
-            
+
     # Wyświetlanie wyników
     if 'scan_result' in st.session_state and not st.session_state['scan_result'].empty:
         df = st.session_state['scan_result']
-        
+
         # Top Picks
         top_picks = df.head(10)
-        
+
         st.markdown(f"#### ELITE SIGNALS (Top {len(top_picks)})")
-        
+
         # Formatowanie tabeli
         # Dodajemy kolory do trendu HTF
         def highlight_htf(val):
@@ -1068,28 +1057,28 @@ def render_scanner_view():
             "score": "{:.1f}",
             "mqs": "{:.0f}"
         })
-        
+
         st.dataframe(styled_df, use_container_width=True)
-        
+
         # Wizualizacja V5
         c_chart1, c_chart2 = st.columns(2)
-        
+
         with c_chart1:
             # Wykres Potencjału vs Ryzyka
             fig = px.scatter(
-                top_picks, x='mqs', y='score', 
+                top_picks, x='mqs', y='score',
                 size='conf', color='htf_trend', hover_name='symbol',
                 title="Market Quality vs AI Score",
                 color_discrete_map={"BULLISH": theme['p'], "BEARISH": "red", "NEUTRAL": "grey"}
             )
             fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
             st.plotly_chart(fig, use_container_width=True)
-            
+
         with c_chart2:
             # Ranking słupkowy
             fig2 = px.bar(
-                top_picks, x='symbol', y='score', 
-                color='signal', 
+                top_picks, x='symbol', y='score',
+                color='signal',
                 title="Final Edge Score (Risk-Adjusted)",
                 color_discrete_map={"BUY": theme['p'], "SELL": "red"}
             )
@@ -1128,17 +1117,14 @@ def render_hud():
     </div>
     """, unsafe_allow_html=True)
 
-
 ==================================================
 FILE: archive\streamlit_ui\ui\styles.py
 ==================================================
 import streamlit as st
 
-
 @st.cache_data
 def _render_css(css: str):
     st.markdown(css, unsafe_allow_html=True)
-
 
 def load_styles(
     mode: str = "ops",
@@ -1263,7 +1249,6 @@ def load_styles(
 
     _render_css(css)
 
-
 ==================================================
 FILE: archive\streamlit_ui\ui\training_view.py
 ==================================================
@@ -1283,10 +1268,10 @@ def render_training_view():
     # Pobieramy motyw z sesji (bezpiecznie)
     theme_name = st.session_state['sys'].get('theme', 'MATRIX')
     theme = THEMES[theme_name]
-    
+
     st.markdown(f"### NEURAL LABS")
     st.caption("Reinforcement Learning & Pattern Correction")
-    
+
     # Linia, która powodowała błąd (teraz bezpieczna dzięki poprawionemu config.py)
     st.markdown(f"<hr style='border-color:{theme['s']}'>", unsafe_allow_html=True)
 
@@ -1295,7 +1280,7 @@ def render_training_view():
     with c1:
         st.info("MANUAL OVERRIDE TRAINING")
         symbol = st.text_input("SYMBOL", "BTC/USDT")
-        
+
         if st.button("FETCH & ANALYZE"):
             df = DataFeed.get_market_data(symbol, "1h", limit=100)
             if not df.empty:
@@ -1307,22 +1292,22 @@ def render_training_view():
     with c2:
         if 'train_df' in st.session_state:
             df = st.session_state['train_df']
-            
+
             # Brain Inference
             brain = DeepBrain()
             price, conf, signal = brain.predict(df)
-            
+
             st.markdown(f"#### AI PREDICTION: <span style='color:{theme['p']}'>{signal}</span> ({conf*100:.1f}%)", unsafe_allow_html=True)
             st.line_chart(df['close'])
-            
+
             st.write("Was this prediction correct?")
-            
+
             b1, b2 = st.columns(2)
             if b1.button(" YES (REWARD)"):
                 snap = {"close": df['close'].iloc[-1], "rsi": 50} # Uproszczony snapshot
                 KnowledgeBase.save_pattern("OPERATOR", snap, 1.0)
                 st.success("Model Rewarded (+1.0)")
-                
+
             if b2.button(" NO (PUNISH)"):
                 snap = {"close": df['close'].iloc[-1], "rsi": 50}
                 KnowledgeBase.save_pattern("OPERATOR", snap, -1.0)
@@ -1347,7 +1332,7 @@ def render_wallet():
     Wersja V2: Zintegrowana z WalletManager i ExecutionEngine.
     """
     theme = THEMES[st.session_state['sys'].get('theme', 'MATRIX')]
-    
+
     # Pobieramy dane z portfela
     wallet = WalletManager.get_wallet_data()
     balance = wallet.get('balance', 0.0)
@@ -1366,27 +1351,27 @@ def render_wallet():
 
     # --- SEKCJA 1: AKTYWA (ASSETS) ---
     st.markdown("### 🏛️ ACTIVE HOLDINGS")
-    
+
     if assets:
         # Konwersja do DataFrame dla ładnego wyświetlania
         df_assets = pd.DataFrame(assets)
-        
+
         # Obliczamy bieżącą wartość (symulacja, bo w assets mamy cenę wejścia)
-        # W wersji PRO tutaj pobieralibyśmy aktualną cenę z DataFeed, 
+        # W wersji PRO tutaj pobieralibyśmy aktualną cenę z DataFeed,
         # ale na potrzeby widoku portfela wystarczy podgląd wejścia.
-        
+
         # Formatowanie tabeli
         display_df = df_assets.copy()
-        
+
         # Jeśli mamy kolumny z datami w ISO, sformatujmy je
         if 'ts' in display_df.columns:
             display_df['entry_time'] = display_df['ts'] # Uproszczenie
-            
+
         # Wybór kolumn do wyświetlenia
         cols_to_show = ['sym', 'amt', 'entry', 'cost', 'ts']
         # Filtrujemy tylko te, które istnieją
         final_cols = [c for c in cols_to_show if c in display_df.columns]
-        
+
         st.dataframe(
             display_df[final_cols].style.format({
                 "entry": "${:.2f}",
@@ -1396,14 +1381,14 @@ def render_wallet():
             use_container_width=True,
             hide_index=True
         )
-        
+
         # Wykres kołowy alokacji
         if len(assets) > 0:
             fig = px.pie(df_assets, values='cost', names='sym', title='Exposure Allocation',
                          color_discrete_sequence=[theme['p'], '#444', '#666'])
             fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
             st.plotly_chart(fig, use_container_width=True)
-            
+
     else:
         st.info("No active positions. Capital is 100% liquid.")
 
@@ -1411,11 +1396,11 @@ def render_wallet():
 
     # --- SEKCJA 2: HISTORIA (LOGI) ---
     st.markdown("### 📜 TRANSACTION LEDGER")
-    
+
     if history:
         # Odwracamy kolejność (najnowsze na górze)
         df_hist = pd.DataFrame(history).iloc[::-1]
-        
+
         st.dataframe(
             df_hist,
             use_container_width=True,
@@ -1428,11 +1413,11 @@ def render_wallet():
     with st.expander("🛠️ TELLER OPERATIONS (Manual Deposit/Withdraw)", expanded=False):
         c_dep1, c_dep2 = st.columns(2)
         amount = c_dep1.number_input("Amount ($)", min_value=10.0, step=100.0, value=1000.0)
-        
+
         if c_dep2.button("DEPOSIT FUNDS"):
             new_bal = balance + amount
             wallet['balance'] = round(new_bal, 2)
-            
+
             # Log
             if 'history' not in wallet: wallet['history'] = []
             wallet['history'].append({
@@ -1441,7 +1426,7 @@ def render_wallet():
                 "desc": f"MANUAL TRANSFER +${amount}",
                 "pnl_val": 0
             })
-            
+
             WalletManager.save_wallet_data(wallet)
             st.success(f"Deposited ${amount}. New Balance: ${new_bal:.2f}")
             st.rerun()
@@ -1477,7 +1462,6 @@ from .training_view import render_training_view
 from .scanner_view import render_scanner_view
 from .hud import render_hud
 
-
 ==================================================
 FILE: archive\streamlit_ui\ui\js\events_investor.js
 ==================================================
@@ -1500,7 +1484,6 @@ wsInvestor.onclose = () => {
   console.warn("INVESTOR EVENT STREAM DISCONNECTED");
 };
 
-
 ==================================================
 FILE: archive\streamlit_ui\ui\js\events_ops.js
 ==================================================
@@ -1522,7 +1505,6 @@ wsOps.onopen = () => {
 wsOps.onclose = () => {
   console.warn("OPS EVENT STREAM DISCONNECTED");
 };
-
 
 ==================================================
 FILE: archive\streamlit_ui\ui\js\event_renderer.js
@@ -1568,7 +1550,6 @@ function renderEvent(event) {
 }
 
 window.renderEvent = renderEvent;
-
 
 ==================================================
 FILE: assets\training_report.json
@@ -1634,7 +1615,6 @@ from trading.wallet import WalletManager
 
 from core.logger import log_event
 from core.event_logger import EventLogger
-
 
 class RedlineAICore:
     """
@@ -1824,11 +1804,9 @@ class RedlineAICore:
         self.set_mode("SEMI")
         log_event("AI AUTO LOOP STOPPED", "WARN")
 
-
 ==================================================
 FILE: backend\auth.py
 ==================================================
-
 
 ==================================================
 FILE: backend\events_server.py
@@ -1840,7 +1818,6 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from urllib.parse import parse_qs
 
 app = FastAPI()
-
 
 # =====================================================
 # EVENT SOURCE (DEMO, ALE PERSISTENT)
@@ -1903,7 +1880,6 @@ async def event_loop(ws: WebSocket, scope: str):
             print(f"[EVENTS] Error: {e}")
             await asyncio.sleep(1)
 
-
 # =====================================================
 # WEBSOCKET ENDPOINT
 # =====================================================
@@ -1920,7 +1896,6 @@ async def events_ws(ws: WebSocket):
     print(f"[EVENTS] Client connected ({scope})")
 
     await event_loop(ws, scope)
-
 
 ==================================================
 FILE: backend\hud_server.py
@@ -1965,7 +1940,6 @@ async def hud_ws(ws: WebSocket):
             await asyncio.sleep(1)
     except WebSocketDisconnect:
         pass
-
 
 ==================================================
 FILE: backend\main.py
@@ -2125,7 +2099,6 @@ async def hud_ws(ws: WebSocket):
     except WebSocketDisconnect:
         pass
 
-
 ==================================================
 FILE: core\auto_rotator.py
 ==================================================
@@ -2146,7 +2119,6 @@ class AutoRotator:
         ranked = scanner.scan()
         print(f"Scan completed: {len(ranked)} assets analyzed.")
         return ranked
-
 
 ==================================================
 FILE: core\bootstrap.py
@@ -2186,7 +2158,7 @@ def session_watchdog():
     V2: Soft-Reset (zachowuje dowody włamania) + Bezpieczny dostęp.
     """
     TIMEOUT_SECONDS = 300  # 5 minut
-    
+
     # 1. Bezpieczne sprawdzenie inicjalizacji
     if "last_active" not in st.session_state or "sys" not in st.session_state:
         return
@@ -2199,23 +2171,23 @@ def session_watchdog():
             # Walidacja typu last_active (ochrona przed prostym spoofingiem typu string)
             last = float(st.session_state["last_active"])
             idle_time = time.time() - last
-            
+
             if idle_time > TIMEOUT_SECONDS:
                 st.warning("SESSION TIMEOUT. SECURE LOCK.")
-                
+
                 # --- SOFT RESET (Forensic preservation) ---
                 # Nie robimy clear(), tylko zerujemy dostęp
                 st.session_state["sys"]["auth"] = False
                 st.session_state["sys"]["user"] = None
                 st.session_state["sys"]["role"] = None
                 # Logi i flaga 'breach' zostają w pamięci!
-                
+
                 # Wymuszenie przerysowania UI
                 st.rerun()
             else:
                 # Heartbeat
                 st.session_state["last_active"] = time.time()
-                
+
         except (ValueError, TypeError):
             # Jeśli ktoś manipulował last_active -> natychmiastowy wylot
             st.session_state["sys"]["auth"] = False
@@ -2230,13 +2202,13 @@ FILE: core\config.py
 
 # --- SYSTEM DEPENDENCIES (FIX BŁĘDU IMPORTU) ---
 REQUIRED_LIBS = [
-    "streamlit", 
-    "pandas", 
-    "numpy", 
-    "ccxt", 
-    "yfinance", 
-    "ta", 
-    "textblob", 
+    "streamlit",
+    "pandas",
+    "numpy",
+    "ccxt",
+    "yfinance",
+    "ta",
+    "textblob",
     "plotly",
     "torch",
     "sklearn"
@@ -2285,7 +2257,6 @@ import os
 import json
 import uuid
 from datetime import datetime as dt
-
 
 class EventLogger:
     """
@@ -2438,7 +2409,6 @@ class EventLogger:
             "hold_time_min": round(hold_time_min, 1)
         })
 
-
 ==================================================
 FILE: core\logger.py
 ==================================================
@@ -2464,14 +2434,14 @@ def log_event(message: str, level: str = "INFO"):
     # 2. Sanityzacja i Truncate (Anti-DoS)
     # Usuwamy znaki nowej linii i tniemy do 500 znaków
     clean_msg = str(message).replace("\n", " ").strip()[:500]
-    
+
     ts = datetime.now().strftime("%H:%M:%S")
     entry = f"[{ts}] [{level}] {clean_msg}"
 
     # 3. Bezpieczny zapis
     if "logs" in st.session_state["sys"]:
         st.session_state["sys"]["logs"].insert(0, entry)
-        
+
         # Hard Limit pamięci podręcznej (ostatnie 200 zdarzeń)
         if len(st.session_state["sys"]["logs"]) > 200:
             st.session_state["sys"]["logs"].pop()
@@ -2495,12 +2465,12 @@ class Orchestrator:
     def __init__(self, mode="PAPER"):
         self.mode = mode
         self.is_running = False
-        
+
         self.scanner = MarketScanner(timeframe="1h")
         self.decision_engine = DecisionEngine(mode)
         self.execution_engine = ExecutionEngine(mode)
         self.position_manager = PositionManager(mode)
-        
+
         log_event(f"ORCHESTRATOR READY [{self.mode}]", "INFO")
 
     def run_cycle(self):
@@ -2520,18 +2490,18 @@ class Orchestrator:
         if opportunities.empty: return
 
         candidates = opportunities.head(3)
-        
+
         for _, cand in candidates.iterrows():
             # 3. DECISION (Loguje event DECISION)
             approved, reason, size = self.decision_engine.evaluate_entry(cand, risk_status=is_safe)
-            
+
             if approved:
                 log_event(f"GO: {cand['symbol']} (${size})", "succ")
-                
+
                 # 4. EXECUTION (Przekazujemy signal_id, żeby spiąć logi)
                 sig_id = cand.get('signal_id')
                 res = self.execution_engine.execute_order(cand['symbol'], "BUY", size, signal_id=sig_id)
-                
+
                 if res['status'] == 'FILLED':
                     log_event(f"FILLED: {cand['symbol']}", "TRADE")
             else:
@@ -2574,7 +2544,7 @@ class HardwareSecurity:
         """
         # Symulujemy chwilę "pracy" dla efektu UI
         time.sleep(0.8)
-        
+
         # W trybie PAPER/DEV zawsze zwracamy sukces, żebyś mógł się zalogować
         # W wersji LIVE tutaj byłby kod sprawdzający fizyczne dyski (e.g. win32api.GetLogicalDriveStrings)
         return True, "VIRTUAL_SECURE_DRIVE"
@@ -2647,7 +2617,7 @@ class DataFeed:
                         df['time'] = pd.to_datetime(df['time'], unit='ms')
                 except Exception as e:
                     print(f" Błąd pobierania świec (OHLCV) dla {symbol}: {e}")
-                
+
                 # RATUNEK: Jeśli świece nie przyszły (pusty df), pobieramy chociaż AKTUALNĄ CENĘ
                 # To naprawi "NO DATA" w Scannerze i HUDzie
                 if df.empty:
@@ -2710,7 +2680,6 @@ import numpy as np
 from ta.momentum import RSIIndicator
 from ta.trend import MACD, ADXIndicator, EMAIndicator
 from ta.volatility import BollingerBands, AverageTrueRange
-
 
 class TechnicalIndicators:
     """
@@ -2814,7 +2783,6 @@ class TechnicalIndicators:
             print(f"[Indicators] Error calculating indicators: {e}")
             return df
 
-
 ==================================================
 FILE: data\news.py
 ==================================================
@@ -2823,7 +2791,7 @@ from textblob import TextBlob
 
 class NewsDesk:
     """Moduł Analizy Sentymentu (NLP)"""
-    
+
     @staticmethod
     def get_sentiment(symbol):
         # Symulowane nagłówki (dla celów demo/testu)
@@ -2839,7 +2807,7 @@ class NewsDesk:
 
         # Losujemy newsa
         news = random.choice(headlines)
-        
+
         try:
             # Analiza sentymentu (-1.0 do 1.0)
             analysis = TextBlob(news)
@@ -2866,7 +2834,7 @@ FILE: frontend\index.html
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>REDLINE v.68</title>
     <style>
-  body { margin: 0; background: #f9fafb; color: #111; } 
+  body { margin: 0; background: #f9fafb; color: #111; }
 </style>
   </head>
   <body>
@@ -2968,27 +2936,27 @@ const AppContent = () => {
 
   return (
     <OpsLayout activeTab={activeTab} setActiveTab={setActiveTab}>
-      
+
       {/* --- ROUTING ZAKŁADEK --- */}
-      
+
       {/* 1. Dashboard (Overview) */}
       {activeTab === 'dashboard' && renderDashboard()}
-      
+
       {/* 2. Capital (Wallet) - Teraz podpięty komponent */}
       {activeTab === 'wallet' && <Wallet />}
-      
+
       {/* 3. Scanner (Trading) - Teraz podpięty komponent */}
       {activeTab === 'scanner' && <Scanner />}
-      
+
       {/* 4. AI Labs (Placeholder) */}
       {activeTab === 'training' && <Training />}
         <div style={{
-          height: '100%', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          color: '#999', 
-          flexDirection: 'column', 
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#999',
+          flexDirection: 'column',
           gap: '10px'
         }}>
           <h2 style={{fontWeight: '400'}}>AI Neural Labs</h2>
@@ -2996,8 +2964,7 @@ const AppContent = () => {
             MODULE UNDER CONSTRUCTION
           </span>
         </div>
-      
-      
+
     </OpsLayout>
   );
 };
@@ -3030,16 +2997,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 FILE: frontend\src\api\auth.js
 ==================================================
 
-
 ==================================================
 FILE: frontend\src\api\client.js
 ==================================================
 
-
 ==================================================
 FILE: frontend\src\api\system.js
 ==================================================
-
 
 ==================================================
 FILE: frontend\src\api\trading.js
@@ -3098,7 +3062,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       const data = await response.json();
-      
+
       // Zapisujemy dane użytkownika w stanie aplikacji
       setUser({ username: data.user, role: data.role });
       setToken(data.token);
@@ -3128,68 +3092,56 @@ export const useAuth = () => useContext(AuthContext);
 FILE: frontend\src\auth\RequireRole.jsx
 ==================================================
 
-
 ==================================================
 FILE: frontend\src\auth\useAuth.js
 ==================================================
-
 
 ==================================================
 FILE: frontend\src\components\Events\EventCard.jsx
 ==================================================
 
-
 ==================================================
 FILE: frontend\src\components\Events\EventOverlay.jsx
 ==================================================
-
 
 ==================================================
 FILE: frontend\src\components\HUD\HUD.jsx
 ==================================================
 
-
 ==================================================
 FILE: frontend\src\components\HUD\HudItem.jsx
 ==================================================
-
 
 ==================================================
 FILE: frontend\src\components\HUD\HudMinimal.jsx
 ==================================================
 
-
 ==================================================
 FILE: frontend\src\config\endpoints.js
 ==================================================
-
 
 ==================================================
 FILE: frontend\src\config\roles.js
 ==================================================
 
-
 ==================================================
 FILE: frontend\src\config\settings.js
 ==================================================
-
 
 ==================================================
 FILE: frontend\src\layouts\InvestorLayout.jsx
 ==================================================
 
-
 ==================================================
 FILE: frontend\src\layouts\MinimalLayout.jsx
 ==================================================
-
 
 ==================================================
 FILE: frontend\src\layouts\OpsLayout.jsx
 ==================================================
 import React from 'react';
 import { useEvents } from '../ws/useEvents';
-import { useHud } from '../ws/hud'; 
+import { useHud } from '../ws/hud';
 import { useAuth } from '../auth/AuthContext';
 import { LayoutDashboard, Wallet, ScanLine, Brain, LogOut } from 'lucide-react';
 
@@ -3233,11 +3185,11 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
           <div style={s.logoDot} title={connected ? "System Online" : "Offline"} />
           REDLINE
         </div>
-        
+
         <nav style={s.menu}>
           {menuItems.map(item => (
-            <div 
-              key={item.id} 
+            <div
+              key={item.id}
               style={s.menuItem(activeTab === item.id)}
               onClick={() => setActiveTab(item.id)}
             >
@@ -3265,7 +3217,7 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
           <div style={{fontSize: '14px', color: '#666'}}>
             System Time: <span style={{color:'#111', fontWeight:'600'}}>{metrics.time}</span>
           </div>
-          
+
           <div style={{display:'flex', gap:'32px'}}>
             <div style={s.hudItem}>
               <span style={s.hudLabel}>CPU Load</span>
@@ -3297,31 +3249,25 @@ export default OpsLayout;
 FILE: frontend\src\styles\globals.css
 ==================================================
 
-
 ==================================================
 FILE: frontend\src\styles\ops.css
 ==================================================
-
 
 ==================================================
 FILE: frontend\src\styles\theme.js
 ==================================================
 
-
 ==================================================
 FILE: frontend\src\utils\format.js
 ==================================================
-
 
 ==================================================
 FILE: frontend\src\utils\math.js
 ==================================================
 
-
 ==================================================
 FILE: frontend\src\utils\time.js
 ==================================================
-
 
 ==================================================
 FILE: frontend\src\views\InvestorDashboard.jsx
@@ -3355,7 +3301,7 @@ const PerfCard = ({ label, value, percent }) => (
 const InvestorDashboard = () => {
   return (
     <div style={{maxWidth: '1000px', margin: '0 auto'}}>
-      
+
       {/* WELCOME */}
       <div style={{marginBottom: '40px'}}>
         <h1 style={{fontSize: '28px', fontWeight: '700', margin: 0, color:'#111'}}>Portfolio Overview</h1>
@@ -3378,7 +3324,7 @@ const InvestorDashboard = () => {
             <option>YTD</option>
           </select>
         </div>
-        
+
         {/* Placeholder na wykres */}
         <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc', fontSize: '14px'}}>
           [Interactive Performance Chart Area]
@@ -3493,7 +3439,7 @@ const Login = () => {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        
+
         {/* HEADER */}
         <div style={styles.header}>
           <h1 style={styles.title}>Redline</h1>
@@ -3507,8 +3453,8 @@ const Login = () => {
         <form onSubmit={handleSubmit}>
           <div style={styles.formGroup}>
             <label style={styles.label}>Identity</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Enter your username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -3520,8 +3466,8 @@ const Login = () => {
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Access Token</label>
-            <input 
-              type="password" 
+            <input
+              type="password"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -3531,8 +3477,8 @@ const Login = () => {
             />
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={loading}
             style={{...styles.button, opacity: loading ? 0.7 : 1}}
           >
@@ -3600,7 +3546,7 @@ const OpsDashboard = () => {
       </div>
 
       <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px'}}>
-        
+
         {/* ACTIVE TRADES TABLE */}
         <div style={{background: '#fff', borderRadius: '12px', border: '1px solid #eaeaea', padding: '24px'}}>
           <h3 style={{margin: '0 0 20px 0', fontSize: '16px', fontWeight: '600'}}>Active Positions</h3>
@@ -3647,7 +3593,7 @@ const Scanner = () => {
   const [positions, setPositions] = useState([]);
   const [signals, setSignals] = useState([]); // Nowy stan dla sygnałów AI
   const [scanning, setScanning] = useState(false);
-  
+
   // Stan formularza manualnego
   const [symbol, setSymbol] = useState('BTC/USDT');
 
@@ -3668,7 +3614,7 @@ const Scanner = () => {
     const sym = targetSymbol || symbol;
     try {
       // Używamy executeOrder z api/trading.js
-      const res = await executeOrder(sym, side, 100); 
+      const res = await executeOrder(sym, side, 100);
       if (res.status === 'FILLED') {
         alert(` SUCCESS!\nOrder ID: ${res.order_id}\nPrice: $${res.price}`);
         loadData(); // Odśwież tabelę
@@ -3702,12 +3648,12 @@ const Scanner = () => {
             <h1 style={{fontSize: '24px', fontWeight: '700', margin: 0, color:'#111'}}>Market Scanner</h1>
             <p style={{color: '#666', marginTop: '4px'}}>AI Opportunity Detection & Execution</p>
         </div>
-        <button 
+        <button
             onClick={runAiScan}
             disabled={scanning}
             style={{
-                padding:'12px 24px', 
-                background: scanning ? '#ccc' : '#2962ff', 
+                padding:'12px 24px',
+                background: scanning ? '#ccc' : '#2962ff',
                 color:'#fff', border:'none', borderRadius:'8px', cursor: scanning ? 'wait' : 'pointer',
                 fontWeight:'600', display:'flex', alignItems:'center', gap:'10px'
             }}>
@@ -3717,16 +3663,16 @@ const Scanner = () => {
       </div>
 
       <div style={{display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px'}}>
-        
+
         {/* LEWA: MANUAL + SIGNALS */}
         <div style={{display:'flex', flexDirection:'column', gap:'24px'}}>
-            
+
             {/* MANUAL ENTRY CARD */}
             <div style={{background: '#fff', borderRadius: '16px', border: '1px solid #eaeaea', padding: '24px'}}>
             <h3 style={{margin: '0 0 20px 0', fontSize: '16px', fontWeight: '600'}}>Manual Entry</h3>
             <div style={{marginBottom:'15px'}}>
                 <label style={{display:'block', fontSize:'12px', fontWeight:'600', marginBottom:'8px'}}>Symbol</label>
-                <input 
+                <input
                 value={symbol} onChange={e => setSymbol(e.target.value)}
                 style={{width:'100%', padding:'12px', border:'1px solid #eee', borderRadius:'8px', fontSize:'14px', boxSizing:'border-box'}}
                 />
@@ -3754,7 +3700,7 @@ const Scanner = () => {
                                 </div>
                                 <div style={{textAlign:'right'}}>
                                     <div style={{fontSize:'12px', fontWeight:'700', color: sig.signal === 'BUY' ? '#00c853' : '#ff3d00'}}>{sig.signal}</div>
-                                    <button 
+                                    <button
                                         onClick={() => handleTrade(sig.signal, sig.symbol)}
                                         style={{marginTop:'6px', padding:'4px 12px', fontSize:'11px', background:'#111', color:'#fff', border:'none', borderRadius:'4px', cursor:'pointer'}}>
                                         EXECUTE
@@ -3773,7 +3719,7 @@ const Scanner = () => {
             <h3 style={{margin: 0, fontSize: '16px', fontWeight: '600'}}>Portfolio Positions</h3>
             <div style={{background:'#e8f5e9', color:'#00c853', padding:'4px 8px', borderRadius:'6px', fontSize:'11px', fontWeight:'700'}}>LIVE</div>
           </div>
-          
+
           <table style={{width:'100%', borderCollapse:'collapse', fontSize:'13px'}}>
             <thead>
               <tr style={{textAlign:'left', color:'#888', borderBottom:'1px solid #eee'}}>
@@ -3800,7 +3746,7 @@ const Scanner = () => {
               ))}
             </tbody>
           </table>
-          
+
           {positions.length === 0 && (
             <div style={{padding:'40px', textAlign:'center', color:'#999', fontSize:'13px'}}>
               No active positions. Run Scanner to find setups.
@@ -3817,7 +3763,6 @@ export default Scanner;
 ==================================================
 FILE: frontend\src\views\system.jsx
 ==================================================
-
 
 ==================================================
 FILE: frontend\src\views\training.jsx
@@ -3865,7 +3810,7 @@ const Training = () => {
       </div>
 
       <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px'}}>
-        
+
         {/* LEWA KOLUMNA: WYKRES */}
         <div style={{background: '#fff', borderRadius: '16px', border: '1px solid #eaeaea', padding: '24px', height: '400px', display:'flex', flexDirection:'column'}}>
             <div style={{marginBottom:'20px', display:'flex', justifyContent:'space-between'}}>
@@ -3875,7 +3820,7 @@ const Training = () => {
                     <span style={{color:'#82ca9d'}}>● Accuracy</span>
                 </div>
             </div>
-            
+
             <div style={{flex:1}}>
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData}>
@@ -3892,7 +3837,7 @@ const Training = () => {
 
         {/* PRAWA KOLUMNA: PANEL STEROWANIA */}
         <div style={{display:'flex', flexDirection:'column', gap:'20px'}}>
-            
+
             {/* STATUS CARD */}
             <div style={{background: '#fff', borderRadius: '16px', border: '1px solid #eaeaea', padding: '24px'}}>
                 <div style={{fontSize:'12px', textTransform:'uppercase', color:'#888', fontWeight:'700', marginBottom:'10px'}}>Current Status</div>
@@ -3902,7 +3847,7 @@ const Training = () => {
                         {isTraining ? 'TRAINING IN PROGRESS...' : 'MODEL IDLE'}
                     </span>
                 </div>
-                
+
                 <div style={{marginBottom:'15px'}}>
                     <div style={{display:'flex', justifyContent:'space-between', fontSize:'13px', marginBottom:'5px'}}>
                         <span>Epoch Progress</span>
@@ -3928,7 +3873,7 @@ const Training = () => {
             {/* ACTIONS */}
             <div style={{background: '#fff', borderRadius: '16px', border: '1px solid #eaeaea', padding: '24px'}}>
                 <h3 style={{margin:'0 0 15px 0', fontSize:'15px', fontWeight:'600'}}>Controls</h3>
-                <button 
+                <button
                     onClick={toggleTraining}
                     style={{
                         width:'100%', padding:'14px', borderRadius:'8px', border:'none', cursor:'pointer',
@@ -3972,7 +3917,7 @@ const Wallet = () => {
       </div>
 
       <div style={{display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px'}}>
-        
+
         {/* LEFT: SUMMARY CARD */}
         <div style={{background: '#111', color: '#fff', padding: '32px', borderRadius: '16px', display:'flex', flexDirection:'column', justifyContent:'space-between'}}>
           <div>
@@ -4078,7 +4023,6 @@ export const useHud = () => {
 FILE: frontend\src\ws\reconnect.js
 ==================================================
 
-
 ==================================================
 FILE: frontend\src\ws\useEvents.js
 ==================================================
@@ -4092,7 +4036,7 @@ export const useEvents = (scope = "OPS") => {
     // UWAGA: Proxy przekieruje /ws na port 8000
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host; // zazwyczaj localhost:3000
-    
+
     const connect = () => {
       ws.current = new WebSocket(`${protocol}//${host}/ws/events?scope=${scope}`);
 
@@ -4103,12 +4047,12 @@ export const useEvents = (scope = "OPS") => {
       ws.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+
           // Ignorujemy Heartbeat w konsoli, żeby nie śmiecić
           if (data.type !== 'HEARTBEAT') {
             // Tutaj w przyszłości wepniemy system "Toasts" (dymki powiadomień)
             console.log("🔔 EVENT:", data);
-            
+
             // Prosty alert browsera dla testu (tylko dla ważnych błędów)
             if (data.level === 'error') {
                alert(`SYSTEM ALERT: ${data.message}`);
@@ -4167,7 +4111,6 @@ class TimeSeriesDataset(Dataset):
     def __getitem__(self, idx):
         return self.X[idx], self.y[idx]
 
-
 class NeuralNet(nn.Module):
     """
     DeepBrain V6 Core.
@@ -4176,7 +4119,7 @@ class NeuralNet(nn.Module):
     def __init__(self, input_dim, hidden_dim=64, num_layers=2, dropout=0.2, arch_type='LSTM'):
         super(NeuralNet, self).__init__()
         self.arch_type = arch_type
-        
+
         if arch_type == 'GRU':
             self.rnn = nn.GRU(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout)
         else:
@@ -4195,7 +4138,6 @@ class NeuralNet(nn.Module):
         prediction = self.fc(out)
         return prediction
 
-
 # ================================================================
 # DEEP BRAIN ENGINE V6 (Institutional Grade)
 # ================================================================
@@ -4205,9 +4147,9 @@ class DeepBrain:
         self.lookback = lookback
         self.model_path = os.path.join("assets", "redline_brain_v6.pt")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         # Local Context Scaler (Anti-Leakage)
-        self.scaler = StandardScaler() 
+        self.scaler = StandardScaler()
         self.model = None
         self.current_arch = "LSTM"
         self.is_trained = False
@@ -4221,12 +4163,12 @@ class DeepBrain:
             return None, None
 
         data = df.copy()
-        
+
         # 1. Target: Log Returns (Dynamika, nie cena)
         data['log_ret'] = np.log(data['close'] / data['close'].shift(1))
-        
+
         # 2. Features (Robust check)
-        if 'atr' not in data: 
+        if 'atr' not in data:
             data['atr'] = AverageTrueRange(data['high'], data['low'], data['close'], window=14).average_true_range()
         if 'rsi' not in data:
             data['rsi'] = RSIIndicator(data['close'], 14).rsi()
@@ -4237,7 +4179,7 @@ class DeepBrain:
 
         data.dropna(inplace=True)
         feature_cols = ['log_ret', 'atr', 'rsi', 'macd', 'macd_diff']
-        
+
         # 3. Scaling (Local Context Protection)
         try:
             # Zawsze fitujemy lokalnie, aby uniknąć cross-asset leakage w Skanerze
@@ -4246,7 +4188,7 @@ class DeepBrain:
             return None, None
 
         X, y = [], []
-        target_col_idx = 0 
+        target_col_idx = 0
 
         for i in range(self.lookback, len(scaled_data)):
             X.append(scaled_data[i-self.lookback:i])
@@ -4263,7 +4205,7 @@ class DeepBrain:
 
         dataset = TimeSeriesDataset(X, y)
         loader = DataLoader(dataset, batch_size=32, shuffle=True)
-        
+
         # Auto-Switch Architecture based on Volatility Regime
         atr_val = df['atr'].iloc[-1] if 'atr' in df else 0
         self.current_arch = 'GRU' if atr_val > df['close'].iloc[-1] * 0.02 else 'LSTM'
@@ -4323,8 +4265,8 @@ class DeepBrain:
         # 5. MONTE CARLO DROPOUT INFERENCE
         self.model.train() # Wymuszamy dropout
         mc_preds = []
-        iterations = 25 
-        
+        iterations = 25
+
         with torch.no_grad():
             for _ in range(iterations):
                 mc_preds.append(self.model(seq).item())
@@ -4339,23 +4281,23 @@ class DeepBrain:
         atr_pct = (current_atr / last_close) * 100
         # Bazowe sensitivity 80, łagodzone przez ATR (max divisor 2.0)
         dynamic_sensitivity = 80.0 / max(1.0, atr_pct)
-        
+
         confidence = 1.0 / (1.0 + dynamic_sensitivity * std_dev)
         confidence = max(0.0, min(1.0, confidence))
 
         # 8. Konwersja na Cenę
         predicted_price = last_close * np.exp(mean_log_ret)
-        
+
         # 9. EXPECTED VALUE (EV) CALCULATION
         # EV = (Potencjalny Zysk * Prawdopodobieństwo) - (Szum * (1 - Prawdopodobieństwo))
         move_pct = (predicted_price - last_close) / last_close * 100
-        
+
         # Jeśli confidence jest niskie, traktujemy ruch jako noise risk
         ev_score = (move_pct * confidence) - (abs(move_pct) * (1 - confidence) * 0.5)
 
         # 10. Generowanie Sygnału (Instytucjonalny Próg)
         signal = "HOLD"
-        
+
         # Wymagamy: Dodatniego EV, Wysokiego MQS i Min. Confidence
         if ev_score > 0.15 and confidence > 0.55 and mqs > 40:
             signal = "BUY"
@@ -4403,18 +4345,18 @@ class KnowledgeBase:
             try:
                 with open(db_file, "r") as f: data = json.load(f)
             except: data = []
-        
+
         record = features.copy()
-        record['target'] = label 
+        record['target'] = label
         record['ts'] = datetime.now().isoformat()
-        record['ver'] = "V4.5" 
-        
+        record['ver'] = "V4.5"
+
         data.append(record)
-        
+
         if len(data) > KnowledgeBase.MAX_RECORDS:
             excess = len(data) - KnowledgeBase.MAX_RECORDS
             data = data[excess:]
-        
+
         try:
             with open(db_file, "w") as f: json.dump(data, f, indent=4)
         except Exception: return 0
@@ -4428,7 +4370,7 @@ class KnowledgeBase:
             with open(db_file, "r") as f: data = json.load(f)
             return pd.DataFrame(data)
         except: return pd.DataFrame()
-    
+
     @staticmethod
     def clear_memory(user):
         db_file = KnowledgeBase._get_db_path(user)
@@ -4446,7 +4388,7 @@ class MarketRegime:
     """
     V2.5: Market Quality Score + Safety Clamp.
     """
-    
+
     @staticmethod
     def calculate_efficiency_ratio(close_series, period=10):
         if len(close_series) < period + 1: return 0.0
@@ -4457,7 +4399,7 @@ class MarketRegime:
 
     @staticmethod
     def analyze(df):
-        if df.empty or len(df) < 20: 
+        if df.empty or len(df) < 20:
             return 0, "NO_DATA"
 
         try:
@@ -4465,29 +4407,29 @@ class MarketRegime:
             bb_width = df['bb_width'].iloc[-1] if 'bb_width' in df else 0
             rsi = df['rsi'].iloc[-1] if 'rsi' in df else 50
             er = MarketRegime.calculate_efficiency_ratio(df['close'], 10)
-            
+
             score = 0
             # A. Czystosc
             if er > 0.6: score += 30
             elif er > 0.3: score += 15
-            
+
             # B. Trend
             if 25 < adx < 60: score += 30
             elif adx >= 60: score += 15
-            
+
             # C. Zmiennosc
             if 0.05 < bb_width < 0.30: score += 20
-            
+
             # D. Momentum
             if 40 < rsi < 80: score += 20
-            
+
             # Normalizacja (Safety Clamp)
             score = max(0, min(100, score))
-            
+
             if score >= 80: regime = "SNIPER (Perfect Trend)"
             elif score >= 50: regime = "STANDARD (Tradeable)"
             else: regime = "TOXIC (Chop/Noise)"
-            
+
             return score, regime
 
         except Exception as e:
@@ -4526,7 +4468,7 @@ class MarketScanner:
             ex = ccxt.binance()
             tickers = ex.fetch_tickers()
             valid_tickers = [
-                data for symbol, data in tickers.items() 
+                data for symbol, data in tickers.items()
                 if "/USDT" in symbol and "UP/" not in symbol and "DOWN/" not in symbol
             ]
             sorted_tickers = sorted(valid_tickers, key=lambda x: x['quoteVolume'], reverse=True)
@@ -4546,15 +4488,15 @@ class MarketScanner:
     def scan(self):
         results = []
         symbols = self.get_top_volume_symbols(limit=50)
-        
+
         print(f"--- OPS SCAN START: {len(symbols)} Assets ---")
-        
+
         for i, symbol in enumerate(symbols):
             try:
                 # 1. Dane LTF
                 df = DataFeed.get_market_data(symbol, self.tf, limit=100)
                 if df.empty or len(df) < 60: continue
-                
+
                 # 2. Regime
                 mqs, _ = MarketRegime.analyze(df)
                 if mqs < 35: continue
@@ -4567,18 +4509,18 @@ class MarketScanner:
                 htf_trend = self._get_htf_trend(symbol)
                 if signal == "BUY" and htf_trend == "BEARISH" and mqs < 80:
                     continue
-                
+
                 # 5. EV Calculation
                 last_price = df["close"].iloc[-1]
                 growth_pct = (pred_price - last_price) / last_price * 100
-                
+
                 atr = df['atr'].iloc[-1] if 'atr' in df else (last_price * 0.01)
                 vol_pct = (atr / last_price) * 100 or 1.0
                 rr = growth_pct / vol_pct
-                
+
                 # EV Score (Uproszczony na potrzeby logowania)
                 ev_val = (growth_pct * conf) - (abs(growth_pct) * (1 - conf))
-                
+
                 final_score = (conf ** 1.5) * rr * 100
 
                 # 6. LOGOWANIE SYGNAŁU (EventLogger)
@@ -4605,7 +4547,7 @@ class MarketScanner:
                     "ev": ev_val,
                     "ts": datetime.now().strftime("%H:%M")
                 })
-                
+
                 print(f"[{i+1}] {symbol}: HIT! ID: {signal_id}")
 
             except Exception as e:
@@ -4684,7 +4626,7 @@ class OfflineTrainer:
 
                 if success:
                     loss_val = round(float(self.brain.last_train_loss), 6)
-                    
+
                     results["assets"].append({
                         "symbol": symbol,
                         "rows": len(df),
@@ -4696,7 +4638,7 @@ class OfflineTrainer:
                 else:
                     results["errors"].append({"asset": symbol, "reason": "TRAINING_FAILED"})
                     log_event(f"MODEL TRAINING FAILED FOR {symbol}", "ERROR")
-                
+
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
@@ -4750,7 +4692,7 @@ class RedTeamOps:
     def crack_hash(target_hash):
         """Prosty słownikowy łamacz haseł MD5"""
         dictionary = [
-            "admin", "123456", "password", "redline", 
+            "admin", "123456", "password", "redline",
             "root", "Cyber_Fortress_X1", "qwerty"
         ]
 
@@ -4830,7 +4772,7 @@ class ExchangeSimulator:
         if roll < 0.30:
             # Wypełniamy od 10% do 50% zlecenia
             filled = qty * random.uniform(0.1, 0.5)
-            
+
             # Poślizg cenowy 0.2% - 1.0% (przeciwko nam)
             slippage = random.uniform(0.002, 0.010)
             if side == "BUY":
@@ -4873,7 +4815,7 @@ class MemoryForensics:
     """
 
     SUSPICIOUS_KEYS = [
-        "api_key", "secret", "token", "password", "hash", 
+        "api_key", "secret", "token", "password", "hash",
         "wallet", "private", "seed", "admin", "root"
     ]
 
@@ -4881,17 +4823,17 @@ class MemoryForensics:
     def scan_session_state():
         """Sprawdza obiekt session_state pod kątem wycieków."""
         leaks = []
-        
+
         # Jeśli jesteśmy wylogowani, 'sys' powinno być czyste lub zresetowane
         if "sys" in st.session_state:
             sys_dump = str(st.session_state["sys"])
-            
+
             # Szukamy czy user/role nie wiszą w pamięci
             if "'auth': True" in sys_dump:
                 leaks.append("CRITICAL: AUTH FLAG PERSISTED")
             if "admin" in sys_dump or "ROOT" in sys_dump:
                 leaks.append("WARN: USER DATA PERSISTED IN SYS")
-                
+
         return leaks
 
     @staticmethod
@@ -4914,7 +4856,7 @@ class MemoryForensics:
                                 val_str = str(obj[k])[:50] # Podgląd wartości
                                 if "streamlit" not in val_str and "module" not in val_str:
                                     findings.append(f"FOUND TRACE: {k} = {val_str}...")
-                                    
+
                 if len(findings) > 5: break # Limit wyników dla bezpieczeństwa testu
         except:
             return ["SCAN ERROR (PERMISSION/MEMORY)"]
@@ -4940,7 +4882,7 @@ class AdversarialMarket:
         """
         df_adv = df.copy()
         n = len(df_adv)
-        
+
         # Potrzebujemy min. 20 świec do manipulacji
         if n < 20:
             return df_adv
@@ -4949,14 +4891,14 @@ class AdversarialMarket:
         # To oszukuje algorytmy oparte na średnich kroczących.
         # Generujemy serię małych, pozytywnych zwrotów.
         fake_returns = np.random.normal(0.002, 0.0005, 15) # +0.2% avg
-        
+
         # 2. Sztuczne podbijanie ceny (Painting the Tape)
         current_price = df_adv['close'].iloc[-16]
         for i in range(15):
             idx = n - 15 + i
             current_price = current_price * (1 + fake_returns[i])
             df_adv.at[df_adv.index[idx], 'close'] = current_price
-            
+
             # High/Low też muszą wyglądać "bezpiecznie" (mała zmienność)
             df_adv.at[df_adv.index[idx], 'h'] = current_price * 1.001
             df_adv.at[df_adv.index[idx], 'l'] = current_price * 0.999
@@ -5057,7 +4999,6 @@ class HardwareSecurity:
         print("[HardwareSecurity] Key generated successfully.")
         print("Store this hash securely:", hash_val)
 
-
 ==================================================
 FILE: security\network.py
 ==================================================
@@ -5069,9 +5010,9 @@ class NetworkSentinel:
     Ochrona Sieciowa: IP Allowlist & Geo-Check.
     V3: Zabezpieczona przed 'Fallback Root Escalation'.
     """
-    
+
     FALLBACK_IP = "127.0.0.1"
-    
+
     @staticmethod
     def get_ip():
         """Pobiera IP z krótkim timeoutem."""
@@ -5084,26 +5025,26 @@ class NetworkSentinel:
     @staticmethod
     def check_access(user, current_ip):
         db = UserManager.load_db()
-        
-        if user not in db['active']: 
+
+        if user not in db['active']:
             return False
-            
+
         user_data = db['active'][user]
         allowed_ips = user_data.get('allowed_ips', [])
-        
+
         # FIRST BLOOD RULE: Auto-Add dla Roota
         if not allowed_ips and user_data['role'] == "ROOT":
             # 🛡️ SECURITY FIX: Nie pozwalamy na auto-add, jeśli IP to fallback!
             # Jeśli API padło, nie możemy ufać, że 127.0.0.1 to prawowity admin.
             if current_ip == NetworkSentinel.FALLBACK_IP:
-                return False 
-                
+                return False
+
             NetworkSentinel.authorize_new_ip(user, current_ip)
             return True
-            
+
         if current_ip in allowed_ips:
             return True
-            
+
         return False
 
     @staticmethod
@@ -5111,12 +5052,12 @@ class NetworkSentinel:
         # Dodatkowe zabezpieczenie: nigdy nie dodawaj localhosta do bazy
         if current_ip == NetworkSentinel.FALLBACK_IP:
             return False
-            
+
         db = UserManager.load_db()
         if user in db['active']:
             if 'allowed_ips' not in db['active'][user]:
                 db['active'][user]['allowed_ips'] = []
-            
+
             if current_ip not in db['active'][user]['allowed_ips']:
                 db['active'][user]['allowed_ips'].append(current_ip)
                 UserManager.save_db(db)
@@ -5137,13 +5078,13 @@ class UserManager:
     System Zarządzania Tożsamością (IAM).
     Obsługuje logowanie, hashowanie i system próśb o dostęp.
     """
-    
+
     DB_FILE = os.path.join("assets", "users_db.json")
-    
+
     # Domyślny Root (admin / admin123) - SHA256
     DEFAULT_ROOT = {
         "admin": {
-            "hash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9", 
+            "hash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
             "role": "ROOT",
             "contact": "sysadmin",
             "created": "2026-01-01"
@@ -5164,13 +5105,13 @@ class UserManager:
     def load_db():
         """Ładuje bazę z obsługą błędów JSON."""
         UserManager._ensure_assets()
-        
+
         # Inicjalizacja, jeśli plik nie istnieje
         if not os.path.exists(UserManager.DB_FILE):
             db = {"active": UserManager.DEFAULT_ROOT.copy(), "pending": {}}
             UserManager.save_db(db)
             return db
-            
+
         try:
             with open(UserManager.DB_FILE, "r") as f:
                 return json.load(f)
@@ -5190,38 +5131,38 @@ class UserManager:
         FIX: Hashuje hasło wejściowe przed porównaniem z bazą.
         """
         db = UserManager.load_db()
-        
+
         if user in db['active']:
             stored_data = db['active'][user]
             stored_hash = stored_data.get('hash', '')
-            
+
             # Hashujemy wpisane hasło, aby pasowało do formatu w bazie
             input_hash = UserManager.hash_password(plain_password)
-            
+
             # Bezpieczne porównanie hashów
             if secrets.compare_digest(stored_hash, input_hash):
                 return stored_data.get('role', 'VIEWER')
-        
+
         return None
 
     @staticmethod
     def request_account(username, password, contact):
         """Dodaje prośbę o konto do kolejki 'pending'."""
         db = UserManager.load_db()
-        
+
         if username in db['active']:
             return False, "User already active."
-        
+
         if username in db['pending']:
             return False, "Request pending approval."
-            
+
         db['pending'][username] = {
             "hash": UserManager.hash_password(password),
             "contact": contact,
             "ts": datetime.now().isoformat(),
             "status": "WAITING_FOR_ADMIN"
         }
-        
+
         UserManager.save_db(db)
         return True, "Request submitted to Admin."
 
@@ -5231,12 +5172,12 @@ class UserManager:
         if user in db['pending']:
             user_data = db['pending'].pop(user)
             user_data['role'] = role
-            user_data['allowed_ips'] = [] 
+            user_data['allowed_ips'] = []
             db['active'][user] = user_data
             UserManager.save_db(db)
             return True
         return False
-        
+
     @staticmethod
     def reject_user(user):
         db = UserManager.load_db()
@@ -5259,7 +5200,7 @@ class Vault:
     Moduł obronny: Szyfrowanie Portfela (AES-128 via Fernet).
     V3.1: Skonfigurowany pod Trading System (Startowe $10k).
     """
-    
+
     KEY_FILE = os.path.join("assets", "redline.key")
     WALLET_FILE = os.path.join("assets", "wallet.enc")
     DECOY_FILE = os.path.join("assets", "honeypot.txt")
@@ -5273,7 +5214,7 @@ class Vault:
     def _get_cipher():
         """Pobiera klucz. NIGDY nie generuje nowego, jeśli istnieje osierocony portfel."""
         Vault._ensure_assets_dir()
-        
+
         # --- CRITICAL SAFETY CHECK ---
         # Jeśli portfel istnieje, ale klucza brak -> STOP!
         if os.path.exists(Vault.WALLET_FILE) and not os.path.exists(Vault.KEY_FILE):
@@ -5288,7 +5229,7 @@ class Vault:
                     f.write(key)
             except Exception:
                 return None
-        
+
         try:
             with open(Vault.KEY_FILE, "rb") as f:
                 key = f.read()
@@ -5304,7 +5245,7 @@ class Vault:
             return {"balance": 0, "assets": [], "history": [], "LOCKED": True}
 
         cipher = Vault._get_cipher()
-        
+
         # Jeśli cipher jest None
         if cipher is None:
             return {"balance": 0, "assets": [], "ERROR": "FATAL_KEY_ERROR"}
@@ -5313,14 +5254,14 @@ class Vault:
         if not os.path.exists(Vault.WALLET_FILE):
             # --- ZMIANA TUTAJ: Dajemy $10,000 na start ---
             data = {
-                "balance": 10000.00, 
-                "assets": [], 
+                "balance": 10000.00,
+                "assets": [],
                 "history": [],
                 "LOCKED": False # Wymagane przez execution.py
             }
             Vault.save_wallet(data)
             return data
-            
+
         # 3. Próba deszyfracji
         try:
             with open(Vault.WALLET_FILE, "rb") as f:
@@ -5347,7 +5288,7 @@ class Vault:
     def deploy_honeypot():
         Vault._ensure_assets_dir()
         try:
-            with open(Vault.DECOY_FILE, "w") as f: 
+            with open(Vault.DECOY_FILE, "w") as f:
                 f.write("root_user: admin\npass: 123456\nseed: apple banana cherry\nBTC_WALLET: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
             return True
         except:
@@ -5378,10 +5319,10 @@ class TradeAnalytics:
     def generate_report():
         wallet = WalletManager.get_wallet_data()
         history = wallet.get('history', [])
-        
+
         # Filtrujemy tylko zamknięte transakcje (gdzie jest pnl_val)
         trades = [h for h in history if isinstance(h, dict) and 'pnl_val' in h]
-        
+
         if not trades:
             return {
                 "total_trades": 0,
@@ -5393,24 +5334,24 @@ class TradeAnalytics:
             }
 
         df = pd.DataFrame(trades)
-        
+
         # 1. Podstawowe metryki
         total_trades = len(df)
         wins = df[df['pnl_val'] > 0]
         losses = df[df['pnl_val'] <= 0]
-        
+
         win_rate = (len(wins) / total_trades) * 100 if total_trades > 0 else 0
         net_profit = df['pnl_val'].sum()
-        
+
         # 2. Profit Factor & Expectancy
         gross_profit = wins['pnl_val'].sum()
         gross_loss = abs(losses['pnl_val'].sum())
-        
+
         profit_factor = round(gross_profit / gross_loss, 2) if gross_loss > 0 else float('inf')
-        
+
         avg_win = wins['pnl_val'].mean() if not wins.empty else 0
         avg_loss = losses['pnl_val'].mean() if not losses.empty else 0
-        
+
         # EV = (Win% * AvgWin) - (Loss% * AvgLoss)
         win_dec = win_rate / 100
         expectancy = (win_dec * avg_win) + ((1 - win_dec) * avg_loss)
@@ -5438,7 +5379,7 @@ class CapitalGuard:
     V68: Dynamiczna Agresja oparta na MQS.
     Wersja HARDENED: Odporna na błędy matematyczne i błędne dane API.
     """
-    
+
     @staticmethod
     def calculate_position_size(balance, price, mqs_score):
         # 1. Walidacja Krytyczna Danych Wejściowych (Anti-Crash)
@@ -5446,30 +5387,30 @@ class CapitalGuard:
             return 0.0, 0.0
         if price <= 0: # Ochrona przed dzieleniem przez zero
             return 0.0, 0.0
-        
+
         # Clamp mqs_score do zakresu 0-100 (na wszelki wypadek)
         mqs_score = max(0, min(100, mqs_score))
 
         # Baza: Maksymalnie 15% kapitału na pozycję w idealnych warunkach
-        MAX_RISK = 0.15 
-        
+        MAX_RISK = 0.15
+
         # Funkcja agresji: Kwadratowa (karze niskie wyniki, nagradza wysokie)
         # Przy MQS 50 -> aggression = 0.25 (25% mocy)
         aggression_factor = (mqs_score / 100.0) ** 2
-        
+
         usd_size = balance * MAX_RISK * aggression_factor
-        
+
         # Hard Limit: Nie więcej niż 98% salda (zostawiamy na fees)
         if usd_size > balance * 0.98:
             usd_size = balance * 0.98
 
         # Min. wielkość zlecenia (np. $11 dla Binance)
-        if usd_size < 11.0: 
+        if usd_size < 11.0:
             usd_size = 0.0
-        
+
         # Obliczenie ilości (zabezpieczone, bo price > 0 sprawdzone wyżej)
         qty = usd_size / price
-        
+
         # Zaokrąglenie finansowe (2 miejsca dla USD, 6 dla krypto)
         return round(usd_size, 2), round(qty, 6)
 
@@ -5492,10 +5433,10 @@ class DecisionEngine:
         self.mode = mode
         self.max_concurrent_positions = 3
         self.min_confidence = 0.60
-        
+
         self.COOLDOWN_MINUTES = 60
-        self.SESSION_START = time(7, 0)  
-        self.SESSION_END = time(21, 0)   
+        self.SESSION_START = time(7, 0)
+        self.SESSION_END = time(21, 0)
 
     def _check_session(self):
         now = datetime.utcnow().time()
@@ -5504,13 +5445,13 @@ class DecisionEngine:
     def _check_cooldown(self, symbol):
         wallet = WalletManager.get_wallet_data()
         history = wallet.get('history', [])
-        
+
         last_trade_ts = None
         for trade in reversed(history):
             if isinstance(trade, dict) and trade.get('symbol') == symbol:
                 last_trade_ts = trade.get('ts')
                 break
-        
+
         if last_trade_ts:
             try:
                 # Obsługa formatu ISO z EventLoggera lub prostego czasu
@@ -5521,12 +5462,12 @@ class DecisionEngine:
                     last_dt = datetime.strptime(last_trade_ts, "%H:%M:%S")
                     now = datetime.now()
                     last_dt = last_dt.replace(year=now.year, month=now.month, day=now.day)
-                
+
                 diff = (datetime.now() - last_dt).total_seconds() / 60
                 if diff < self.COOLDOWN_MINUTES:
                     return False, f"COOLDOWN ({int(diff)}m)"
             except: pass
-                
+
         return True, "OK"
 
     def evaluate_entry(self, candidate, risk_status=True):
@@ -5537,7 +5478,7 @@ class DecisionEngine:
         symbol = candidate['symbol']
         signal = candidate['signal']
         signal_id = candidate.get('signal_id', 'MANUAL') # Pobieramy ID ze skanera
-        
+
         reasons = []
         checks = {}
         approved = False
@@ -5572,7 +5513,7 @@ class DecisionEngine:
             if symbol in curr_assets:
                 final_reason = "ALREADY_IN_POS"
                 raise StopIteration
-            
+
             if len(curr_assets) >= self.max_concurrent_positions:
                 final_reason = "MAX_SLOTS_FULL"
                 raise StopIteration
@@ -5589,7 +5530,7 @@ class DecisionEngine:
 
             balance = wallet.get('balance', 0)
             mqs = candidate.get('mqs', 50)
-            
+
             size, _ = CapitalGuard.calculate_position_size(balance, price, mqs)
             if size < 10:
                 final_reason = "SIZE_TOO_SMALL"
@@ -5615,7 +5556,6 @@ class DecisionEngine:
         )
         DecisionCore = DecisionEngine
 
-
         return approved, final_reason, size_usd
 
 ==================================================
@@ -5638,7 +5578,7 @@ class ExecutionEngine:
 
     def execute_order(self, symbol, side, amount_usd, signal_id=None):
         wallet = WalletManager.get_wallet_data()
-        
+
         # 1. Price Check
         try:
             ticker_data = DataFeed.get_market_data(symbol, "1m", limit=1)
@@ -5655,7 +5595,7 @@ class ExecutionEngine:
                 balance = wallet.get('balance', 0.0)
                 if balance < amount_usd:
                     return {'status': 'FAILED', 'reason': 'NSF'}
-                
+
                 # --- LOGOWANIE EXECUTION ---
                 # Generujemy Trade ID powiązany z Signal ID
                 trade_id = EventLogger.log_execution(
@@ -5671,7 +5611,7 @@ class ExecutionEngine:
                 # Aktualizacja portfela
                 wallet['balance'] = round(balance - amount_usd, 2)
                 if 'assets' not in wallet: wallet['assets'] = []
-                
+
                 wallet['assets'].append({
                     "trade_id": trade_id,  # <--- ZAPISUJEMY ID
                     "sym": symbol,
@@ -5682,10 +5622,10 @@ class ExecutionEngine:
                     "sl": fill_price * 0.96,
                     "tp": fill_price * 1.06
                 })
-                
+
                 WalletManager.save_wallet_data(wallet)
                 log_event(f"[PAPER] BOUGHT {symbol} (ID: {trade_id})", "TRADE")
-                
+
                 return {'status': 'FILLED', 'avg_price': fill_price, 'trade_id': trade_id}
 
         return {'status': 'FAILED', 'reason': 'BAD MODE'}
@@ -5696,12 +5636,12 @@ class ExecutionEngine:
             qty = position_data['amt']
             cost = position_data['cost']
             trade_id = position_data.get('trade_id', 'UNKNOWN') # Pobieramy ID
-            
+
             revenue = qty * exit_price
             pnl = revenue - cost
-            
+
             wallet['balance'] = round(wallet.get('balance', 0) + revenue, 2)
-            
+
             # Obliczanie czasu trwania
             hold_min = 0
             try:
@@ -5719,7 +5659,7 @@ class ExecutionEngine:
                 hold_time_min=hold_min,
                 trade_id=trade_id
             )
-            
+
             # Historia w portfelu (dla szybkiego UI)
             if 'history' not in wallet: wallet['history'] = []
             wallet['history'].append({
@@ -5730,10 +5670,10 @@ class ExecutionEngine:
                 "pnl_val": round(pnl, 2),
                 "desc": f"EXIT {symbol} | PnL: ${pnl:.2f}"
             })
-            
+
             WalletManager.save_wallet_data(wallet)
             return True
-            
+
         return False
 
 ==================================================
@@ -5781,7 +5721,7 @@ class PositionManager:
         dirty = False
         for pos in assets[:]:
             symbol = pos['sym']
-            
+
             # Obsługa daty (ISO vs Legacy)
             try:
                 if "T" in pos['ts']:
@@ -5808,7 +5748,7 @@ class PositionManager:
                 if self.executor.close_position(symbol, pos, curr_price, reason):
                     assets.remove(pos)
                     dirty = True
-        
+
         if dirty:
             wallet['assets'] = assets
             WalletManager.save_wallet_data(wallet)
@@ -5820,7 +5760,7 @@ from security.vault import Vault
 
 class WalletManager:
     """Zarządca stanu portfela (Read Ops)"""
-    
+
     @staticmethod
     def get_wallet_data():
         return Vault.load_wallet()
@@ -5832,7 +5772,7 @@ class WalletManager:
         if data.get('LOCKED', False) or 'ERROR' in data:
             return 0.0
         return data.get('balance', 0.0)
-        
+
     @staticmethod
     def get_assets():
         data = Vault.load_wallet()

@@ -61,7 +61,7 @@ class OfflineTrainer:
 
                 if success:
                     loss_val = round(float(self.brain.last_train_loss), 6)
-                    
+
                     results["assets"].append({
                         "symbol": symbol,
                         "rows": len(df),
@@ -73,7 +73,7 @@ class OfflineTrainer:
                 else:
                     results["errors"].append({"asset": symbol, "reason": "TRAINING_FAILED"})
                     log_event(f"MODEL TRAINING FAILED FOR {symbol}", "ERROR")
-                
+
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 

@@ -6,7 +6,6 @@ from urllib.parse import parse_qs
 
 app = FastAPI()
 
-
 # =====================================================
 # EVENT SOURCE (DEMO, ALE PERSISTENT)
 # =====================================================
@@ -67,7 +66,6 @@ async def event_loop(ws: WebSocket, scope: str):
         except Exception as e:
             print(f"[EVENTS] Error: {e}")
             await asyncio.sleep(1)
-
 
 # =====================================================
 # WEBSOCKET ENDPOINT

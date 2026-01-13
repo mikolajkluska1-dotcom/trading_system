@@ -1,0 +1,22 @@
+{
+    "active": {
+        "admin": {
+            "hash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+            "role": "ROOT",
+            "contact": "sysadmin",
+            "created": "2026-01-01"
+        },
+        "jankowalski@gmail.com": {
+            "hash": "92716d7641edd8355455fef41dc46f1c3ba1f988d536dfbb1ee59c464ae6ce19",
+            "contact": "Jan Kowalski | 123456789 | witam",
+            "ts": "2026-01-09T00:33:39.777672",
+            "status": "WAITING_FOR_ADMIN",
+            "role": "INVESTOR",
+            "created_at": "2026-01-09T00:33:59.426793",
+            "trading_enabled": false,
+            "risk_limit": 1000.0,
+            "notes": "Approved by Admin"
+        }
+    },
+    "pending": {}
+}

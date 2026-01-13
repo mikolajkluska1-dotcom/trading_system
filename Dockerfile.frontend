@@ -1,0 +1,19 @@
+# Obraz Node.js
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Kopiowanie definicji zależności
+COPY frontend/package.json frontend/package-lock.json ./
+
+# Instalacja zależności
+RUN npm install
+
+# Kopiowanie kodu źródłowego
+COPY frontend/ ./
+
+# Port Vite
+EXPOSE 5173
+
+# Uruchomienie w trybie developerskim (host 0.0.0.0 pozwala na dostęp z zewnątrz kontenera)
+CMD ["npm", "run", "dev", "--", "--host"]

@@ -14,7 +14,7 @@ class AdversarialMarket:
         """
         df_adv = df.copy()
         n = len(df_adv)
-        
+
         # Potrzebujemy min. 20 świec do manipulacji
         if n < 20:
             return df_adv
@@ -23,14 +23,14 @@ class AdversarialMarket:
         # To oszukuje algorytmy oparte na średnich kroczących.
         # Generujemy serię małych, pozytywnych zwrotów.
         fake_returns = np.random.normal(0.002, 0.0005, 15) # +0.2% avg
-        
+
         # 2. Sztuczne podbijanie ceny (Painting the Tape)
         current_price = df_adv['close'].iloc[-16]
         for i in range(15):
             idx = n - 15 + i
             current_price = current_price * (1 + fake_returns[i])
             df_adv.at[df_adv.index[idx], 'close'] = current_price
-            
+
             # High/Low też muszą wyglądać "bezpiecznie" (mała zmienność)
             df_adv.at[df_adv.index[idx], 'h'] = current_price * 1.001
             df_adv.at[df_adv.index[idx], 'l'] = current_price * 0.999

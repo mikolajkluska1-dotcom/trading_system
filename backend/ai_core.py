@@ -1,7 +1,7 @@
 # backend/ai_core.py
 """
 REDLINE AI CORE — GEN 3.8 (HYBRID INTELLIGENCE)
-Integration: Logic Engine + Neural Network (DeepBrain)
+Integration: Logic Engine + Neural Network (DeepBrain) + External Agentic Data (n8n)
 """
 
 import logging
@@ -10,6 +10,7 @@ from datetime import datetime
 
 # ML Imports
 from ml.brain import DeepBrain
+from ml.whale_watcher import WhaleWatcher
 
 # Logging setup
 logging.basicConfig(
@@ -80,25 +81,51 @@ class DecisionEngine:
 class RedlineAICore:
     """
     HYBRID ORCHESTRATOR
-    Łączy logikę klasyczną (DecisionEngine) z intuicją ML (DeepBrain).
+    Łączy logikę klasyczną (DecisionEngine), intuicję ML (DeepBrain) oraz
+    zewnętrzne dane agentowe (External Context / n8n).
     """
-  
+
     def __init__(self, mode="PAPER", timeframe="1h"):
-  
+
         self.state = {
             "mode": mode,
             "running": True,
             "timeframe": timeframe,
-            "engine": "GEN-3.8 (Hybrid)"
+            "engine": "GEN-3.8 (Hybrid + Agentic)"
         }
+        
+        # Pamięć krótkotrwała dla danych z zewnątrz (n8n / agenty newsowe)
+        self.external_context = {
+            "sentiment": 50.0, # 0-100 (50 = Neutral)
+            "last_update": None,
+            "summary": "No external data yet."
+        }
+
+        # Dwa półkule mózgu
         # Dwa półkule mózgu
         self.logic_brain = DecisionEngine()
         self.neural_brain = DeepBrain() # ML V7
-        
+        self.whale_watcher = WhaleWatcher() # Copy Trading Module
+
         logger.info(f"AI CORE INITIALIZED: {self.state}")
 
     def get_state(self):
-        return self.state
+        # Dołączamy external context do stanu
+        full_state = self.state.copy()
+        full_state["external_context"] = self.external_context
+        return full_state
+
+    def update_external_context(self, data):
+        """
+        Metoda dla Webhooka (n8n)
+        Oczekuje: {"sentiment": float, "summary": str}
+        """
+        if "sentiment" in data:
+            self.external_context["sentiment"] = float(data["sentiment"])
+        if "summary" in data:
+            self.external_context["summary"] = data["summary"]
+        self.external_context["last_update"] = datetime.utcnow().isoformat()
+        logger.info(f"🧠 EXT CONTEXT UPDATED: {self.external_context}")
 
     def set_mode(self, mode):
         self.state["mode"] = mode.upper()
@@ -110,19 +137,54 @@ class RedlineAICore:
     def evaluate(self, symbol, market_data, df, config):
         """
         Główna metoda decyzyjna.
-        Wymaga: market_data (dict) ORAZ df (DataFrame dla ML)
+        Wymaga: market_data (dict) ORAZ df (DataFrame dla ML) ORAZ config (dict)
         """
         # 1. Lewa półkula: Logika (Reguły)
         l_score, l_conf, l_reasons, l_flags = self.logic_brain.analyze(symbol, market_data)
 
         # 2. Prawa półkula: Intuicja (DeepBrain ML)
-        # Zwraca: (price_pred, ml_conf, ml_signal)
         ml_pred, ml_conf, ml_sig = self.neural_brain.predict(df)
+
+        # 3. Trzecie Oko: External Context (Sentiment / n8n)
+        ext_sentiment = self.external_context["sentiment"]
+        sent_weight = config.get("sentiment_weight", 50.0) / 100.0 # Normalizacja 0-1
         
-        # 3. Fuzja Danych (Hybrid Consensus)
-        final_score = l_score
+        # Wpływ sentymentu na wynik podstawowy
+        sentiment_delta = (ext_sentiment - 50.0) * sent_weight 
+        # Np. sentiment 80 (bullish), waga 1.0 -> +30 pkt do score
+        
+        # 4. Fuzja Danych (Hybrid Consensus)
+        final_score = l_score + sentiment_delta
         final_conf = l_conf
         
+        if abs(sentiment_delta) > 5:
+            l_reasons.append(f"Market Sentiment Impact ({sentiment_delta:+.1f})")
+
+        # --- WHALE COPY TRADING INTEGRATION ---
+        if config.get("copy_trading_enabled", False):
+            whale_sig = self.whale_watcher.check_for_signals(symbol)
+            if whale_sig:
+                # Calculate Impact
+                trust = whale_sig['trust_score'] / 100.0
+                factor = config.get("whale_trust_factor", 0.5)
+                
+                # Signal Matching
+                if whale_sig['side'] == "BUY":
+                     # Boost Score
+                     boost = 25.0 * trust * factor
+                     final_score += boost
+                     l_reasons.append(f"🐋 WHALE BUY: {whale_sig['whale']} (+{boost:.1f})")
+                     
+                     # Force Confidence if trust is high
+                     if trust > 0.8:
+                         final_conf = max(final_conf, 0.75)
+                         l_reasons.append("Whale Confidence Boost")
+
+                elif whale_sig['side'] == "SELL":
+                     penalty = 25.0 * trust * factor
+                     final_score -= penalty
+                     l_reasons.append(f"🐋 WHALE SELL: {whale_sig['whale']} (-{penalty:.1f})")
+
         # ML Impact - Jeśli ML jest pewne (>0.6), wpływa na wynik
         if ml_conf > 0.6:
             if ml_sig == "BUY":
@@ -131,22 +193,22 @@ class RedlineAICore:
             elif ml_sig == "SELL":
                 final_score -= 15
                 l_reasons.append(f"ML Confirms SELL (Conf {ml_conf:.2f})")
-            
+
             # Boost pewności jeśli logika i ML się zgadzają
             if (l_score > 60 and ml_sig == "BUY") or (l_score < 40 and ml_sig == "SELL"):
                 final_conf = min(1.0, final_conf + 0.15)
                 l_reasons.append("HYBRID CONFLUENCE") # Najsilniejszy sygnał
-        
-        # OOD Protection (z DeepBraina)
+
+        # OOD Protection
         if "OOD" in ml_sig:
             final_conf = 0.0
             l_reasons.append(f"ML Veto: {ml_sig}")
             l_flags.append("AI_OOD_EVENT")
 
-        # 4. Finalna Klasyfikacja
+        # 5. Finalna Klasyfikacja
         final_score = max(0, min(100, final_score))
         min_conf = config.get("min_confidence", 0.6)
-        
+
         action = "HOLD"
         if final_conf >= min_conf:
             if final_score >= 85: action = "STRONG_BUY"
@@ -156,20 +218,19 @@ class RedlineAICore:
         else:
             l_reasons.append(f"Low Confidence ({final_conf:.2f})")
 
-        # 5. Wynik
+        # 6. Wynik
         decision_id = self._generate_id(symbol, final_score, action)
-        
-        # Logujemy tylko silne sygnały, żeby nie śmiecić
+
         if "STRONG" in action:
             logger.info(f"🧠 HYBRID SIGNAL: {symbol} {action} (Score: {final_score:.0f}, ML Conf: {ml_conf:.2f})")
 
         return TradeSignal(
-            symbol, 
-            round(final_score, 1), 
-            round(final_conf, 2), 
-            action, 
-            l_reasons, 
-            l_flags, 
+            symbol,
+            round(final_score, 1),
+            round(final_conf, 2),
+            action,
+            l_reasons,
+            l_flags,
             decision_id,
             ml_data={"pred": ml_pred, "conf": ml_conf, "sig": ml_sig}
         )

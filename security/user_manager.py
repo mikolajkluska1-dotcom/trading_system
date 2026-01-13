@@ -1,17 +1,16 @@
-import json
-import os
 import secrets
 import hashlib
+import os
 from datetime import datetime
+from core.db import Database
 
 class UserManager:
     """
-    System Zarządzania Tożsamością (IAM) - GEN 2.5 (API Keys Support)
-    Obsługuje: Auth, Roles, Risk Limits, Exchange Credentials
+    System Zarządzania Tożsamością (IAM) - GEN 3.0 (SQLite Powered)
     """
-    
+
     DB_FILE = os.path.join("assets", "users_db.json")
-    
+
     # Domyślny Root
     DEFAULT_ROOT = {
         "admin": {
@@ -30,112 +29,181 @@ class UserManager:
     }
 
     @staticmethod
-    def _ensure_assets():
-        if not os.path.exists("assets"):
-            os.makedirs("assets")
-
-    @staticmethod
     def hash_password(password):
         return hashlib.sha256(password.encode()).hexdigest()
 
     @staticmethod
-    def load_db():
-        UserManager._ensure_assets()
-        if not os.path.exists(UserManager.DB_FILE):
-            db = {"active": UserManager.DEFAULT_ROOT.copy(), "pending": {}}
-            UserManager.save_db(db)
-            return db     
+    def migrate_if_needed():
+        """Migracja z JSON do SQL przy pierwszym uruchomieniu."""
+        json_file = os.path.join("assets", "users_db.json")
+        if not os.path.exists(json_file):
+            return
+
+        import json
         try:
-            with open(UserManager.DB_FILE, "r") as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            return {"active": UserManager.DEFAULT_ROOT.copy(), "pending": {}}
+            with open(json_file, "r") as f:
+                old_db = json.load(f)
+
+            conn = Database.get_connection()
+            cursor = conn.cursor()
+
+            # Migracja aktywnych
+            for user, data in old_db.get('active', {}).items():
+                ex = data.get('exchange_config', {})
+                cursor.execute("""
+                    INSERT OR IGNORE INTO users
+                    (username, hash, role, contact, risk_limit, trading_enabled, api_key, api_secret, exchange, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    user, data.get('hash'), data.get('role'), data.get('contact'),
+                    data.get('risk_limit', 1000.0), 1 if data.get('trading_enabled') else 0,
+                    ex.get('api_key'), ex.get('api_secret'), ex.get('exchange', 'BINANCE'),
+                    data.get('notes')
+                ))
+
+            # Migracja oczekujących
+            for user, data in old_db.get('pending', {}).items():
+                cursor.execute("""
+                    INSERT OR IGNORE INTO pending_users (username, hash, contact)
+                    VALUES (?, ?, ?)
+                """, (user, data.get('hash'), data.get('contact')))
+
+            conn.commit()
+            conn.close()
+
+            # Zmiana nazwy starego pliku
+            os.rename(json_file, json_file + ".bak")
+            print(f" ✅ Migrated users to SQLite from {json_file}")
+        except Exception as e:
+            print(f" ❌ Migration Error: {e}")
 
     @staticmethod
-    def save_db(db):
-        UserManager._ensure_assets()
-        with open(UserManager.DB_FILE, "w") as f:
-            json.dump(db, f, indent=4)
+    def ensure_default_root():
+        """Sprawdza czy istnieje ROOT, jeśli nie - tworzy go z DEFAULT_ROOT."""
+        conn = Database.get_connection()
+        count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        if count == 0:
+            for username, data in UserManager.DEFAULT_ROOT.items():
+                conn.execute("""
+                    INSERT INTO users 
+                    (username, hash, role, contact, risk_limit, trading_enabled)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    username, data['hash'], data['role'], data['contact'],
+                    data['risk_limit'], 1 if data['trading_enabled'] else 0
+                ))
+            conn.commit()
+            print(" ✅ Initialized default admin user.")
+        conn.close()
 
     @staticmethod
-    def verify_login(user, plain_password):
-        db = UserManager.load_db()
-        if user in db['active']:
-            stored_data = db['active'][user]
+    def verify_login(username, plain_password):
+        UserManager.migrate_if_needed()
+        UserManager.ensure_default_root()
+        conn = Database.get_connection()
+        user = conn.execute("SELECT hash, role FROM users WHERE username = ?", (username,)).fetchone()
+        conn.close()
+
+        if user:
+            import secrets
             input_hash = UserManager.hash_password(plain_password)
-            if secrets.compare_digest(stored_data.get('hash', ''), input_hash):
-                return stored_data.get('role', 'VIEWER')
+            if secrets.compare_digest(user['hash'], input_hash):
+                return user['role']
+            else:
+                print(f" [LOGIN FAILED] Hash Mismatch for {username}. DB: {user['hash']} vs Input: {input_hash}")
+        else:
+             print(f" [LOGIN FAILED] User {username} not found in DB.")
         return None
 
     @staticmethod
     def request_account(username, password, contact):
-        db = UserManager.load_db()
-        if username in db['active']: return False, "User already active."
-        if username in db['pending']: return False, "Request pending approval."
-            
-        db['pending'][username] = {
-            "hash": UserManager.hash_password(password),
-            "contact": contact,
-            "ts": datetime.now().isoformat(),
-            "status": "WAITING_FOR_ADMIN"
-        }
-        UserManager.save_db(db)
+        conn = Database.get_connection()
+        # Check if already exists
+        if conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone():
+            conn.close()
+            return False, "User already active."
+        if conn.execute("SELECT 1 FROM pending_users WHERE username = ?", (username,)).fetchone():
+            conn.close()
+            return False, "Request pending approval."
+
+        conn.execute("INSERT INTO pending_users (username, hash, contact) VALUES (?, ?, ?)",
+                     (username, UserManager.hash_password(password), contact))
+        conn.commit()
+        conn.close()
         return True, "Request submitted."
 
     @staticmethod
-    def approve_user(user, role="INVESTOR"):
-        db = UserManager.load_db()
-        if user in db['pending']:
-            user_data = db['pending'].pop(user)
-            user_data.update({
-                "role": role,
-                "created_at": datetime.now().isoformat(),
-                "trading_enabled": False, 
-                "risk_limit": 1000.0,
-                # Puste klucze na start
-                "exchange_config": {
-                    "exchange": "BINANCE",
-                    "api_key": "",
-                    "api_secret": ""
-                },
-                "notes": "Approved by Admin"
-            })
-            db['active'][user] = user_data
-            UserManager.save_db(db)
+    def approve_user(username, role="INVESTOR"):
+        conn = Database.get_connection()
+        pending = conn.execute("SELECT * FROM pending_users WHERE username = ?", (username,)).fetchone()
+
+        if pending:
+            conn.execute("""
+                INSERT INTO users (username, hash, role, contact, notes)
+                VALUES (?, ?, ?, ?, ?)
+            """, (username, pending['hash'], role, pending['contact'], "Approved by Admin"))
+            conn.execute("DELETE FROM pending_users WHERE username = ?", (username,))
+            conn.commit()
+            conn.close()
             return True
-        return False
-        
-    @staticmethod
-    def reject_user(user):
-        db = UserManager.load_db()
-        if user in db['pending']:
-            del db['pending'][user]
-            UserManager.save_db(db)
-            return True
+        conn.close()
         return False
 
     @staticmethod
+    def reject_user(username):
+        conn = Database.get_connection()
+        res = conn.execute("DELETE FROM pending_users WHERE username = ?", (username,)).rowcount
+        conn.commit()
+        conn.close()
+        return res > 0
+
+    @staticmethod
+    def load_db():
+        """Kompatybilność z FastAPI endpointem dla admina"""
+        UserManager.migrate_if_needed()
+        conn = Database.get_connection()
+
+        from security.vault import Vault
+        active = {}
+        users = conn.execute("SELECT * FROM users").fetchall()
+        for u in users:
+            d = dict(u)
+            # Deszyfracja kluczy dla UI/Engine
+            d['api_key'] = Vault.decrypt_string(d.get('api_key', ''))
+            d['api_secret'] = Vault.decrypt_string(d.get('api_secret', ''))
+            active[u['username']] = d
+
+        pending = {}
+        p_users = conn.execute("SELECT * FROM pending_users").fetchall()
+        for u in p_users:
+            pending[u['username']] = dict(u)
+
+        conn.close()
+        return {"active": active, "pending": pending}
+
+    @staticmethod
     def update_user_settings(username, updates: dict):
-        """Edycja ustawień usera - teraz obsługuje klucze API"""
-        db = UserManager.load_db()
-        if username in db['active']:
-            allowed_direct = ['role', 'trading_enabled', 'risk_limit', 'notes', 'contact']
-            
-            # Aktualizacja pól prostych
-            for field in allowed_direct:
-                if field in updates:
-                    db['active'][username][field] = updates[field]
-            
-            # Aktualizacja kluczy API (jeśli podano)
-            if 'api_key' in updates and 'api_secret' in updates:
-                # Jeśli klucze nie są puste, aktualizujemy
-                if updates['api_key'] and updates['api_secret']:
-                    db['active'][username]['exchange_config'] = {
-                        "exchange": "BINANCE", 
-                        "api_key": updates['api_key'],
-                        "api_secret": updates['api_secret']
-                    }
-                
-            UserManager.save_db(db)
-            return True
-        return False
+        conn = Database.get_connection()
+        allowed = ['role', 'trading_enabled', 'risk_limit', 'notes', 'contact', 'api_key', 'api_secret', 'exchange']
+
+        from security.vault import Vault
+        fields = []
+        values = []
+        for k, v in updates.items():
+            if k in allowed:
+                fields.append(f"{k} = ?")
+                val = v
+                if k in ['api_key', 'api_secret'] and v:
+                    val = Vault.encrypt_string(v)
+                values.append(val if k != 'trading_enabled' else (1 if v else 0))
+
+        if not fields:
+            conn.close()
+            return False
+
+        values.append(username)
+        query = f"UPDATE users SET {', '.join(fields)} WHERE username = ?"
+        res = conn.execute(query, tuple(values)).rowcount
+        conn.commit()
+        conn.close()
+        return res > 0

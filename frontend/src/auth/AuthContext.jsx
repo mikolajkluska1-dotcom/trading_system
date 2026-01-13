@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       const data = await response.json();
-      
+
       // Zapisujemy dane użytkownika w stanie aplikacji
       setUser({ username: data.user, role: data.role });
       setToken(data.token);

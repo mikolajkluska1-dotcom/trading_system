@@ -1,213 +1,171 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { fetchPositions, executeOrder } from '../api/trading';
-import { Radar, Zap, Activity, TrendingUp, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { executeOrder } from '../api/trading';
+import { Radar, Zap, Activity, TrendingUp, Crosshair, Target, AlertCircle, Cpu } from 'lucide-react';
+import { useScanner } from '../context/ScannerContext';
+import TiltCard from '../components/TiltCard';
+import Scene3D from '../components/Scene3D';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Scanner = () => {
-  const [positions, setPositions] = useState([]);
-  const [signals, setSignals] = useState([]);
-  const [scanning, setScanning] = useState(false);
-  const [autoMode, setAutoMode] = useState(false); // NOWE: Tryb Auto
+  const scannerStats = useScanner();
+  // If context is missing/loading
+  if (!scannerStats) return <div className="text-center p-10 text-dim">Loading Neural Core...</div>;
+
+  const {
+    positions, signals, scanning, setScanning,
+    autoMode, setAutoMode, loadPositions, runAiScan
+  } = scannerStats;
+
   const [symbol, setSymbol] = useState('BTC/USDT');
-  
-  // Timer Ref do czyszczenia interwału
-  const scanIntervalRef = useRef(null);
-
-  const safePositions = Array.isArray(positions) ? positions : [];
-
-  const loadData = async () => {
-    try {
-      const data = await fetchPositions();
-      setPositions(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.warn('Positions fetch failed', e);
-      setPositions([]);
-    }
-  };
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
+    loadPositions();
   }, []);
-
-  // --- LOGIKA SKANERA ---
-  const runAiScan = async () => {
-    if(!autoMode) setScanning(true); // Spinner tylko w manualu
-    try {
-      const res = await fetch('http://localhost:8000/api/scanner/run');
-      if (!res.ok) return;
-      
-      let data = await res.json();
-      if(Array.isArray(data)) {
-        // Sortowanie: Najlepsze okazje na górze (Score > 80 lub < 20)
-        // Filtrowanie: Pokazujemy tylko TOP 5 "Actionable"
-        const actionable = data.filter(s => Math.abs(s.score - 50) > 15); // Tylko ciekawe
-        const top5 = actionable.slice(0, 5); 
-        
-        // Jeśli w trybie auto nic ciekawego nie ma, pokazujemy chociaż top 3 z listy
-        setSignals(top5.length > 0 ? top5 : data.slice(0,5));
-      }
-    } catch (e) {
-      console.warn('Scan failed', e);
-    }
-    if(!autoMode) setScanning(false);
-  };
-
-  // --- OBSŁUGA AUTO MODE ---
-  useEffect(() => {
-    if (autoMode) {
-      // Start Auto: Skanuj natychmiast i potem co 30s
-      runAiScan();
-      scanIntervalRef.current = setInterval(runAiScan, 30000); // 30s interval
-    } else {
-      // Stop Auto
-      if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
-    }
-    return () => { if (scanIntervalRef.current) clearInterval(scanIntervalRef.current); };
-  }, [autoMode]);
 
   const handleTrade = async (side, targetSymbol = null) => {
     const sym = targetSymbol || symbol;
     try {
       const res = await executeOrder(sym, side, 100);
       if (res?.status === 'FILLED') {
-        alert(`SUCCESS\nOrder ID: ${res.order_id}\nPrice: $${res.price}`);
-        loadData();
+        alert(`EXECUTION CONFIRMED: ${side} ${sym}`);
+        loadPositions();
       } else {
-        alert(`ERROR: ${res?.reason || 'Unknown error'}`);
+        alert('EXECUTION REJECTED');
       }
     } catch (e) {
-      alert(`NETWORK ERROR: ${e.message}`);
+      alert('NETWORK ERROR');
     }
   };
 
-  // STYLE (Uproszczone)
-  const s = {
-    card: { background: '#fff', borderRadius: 12, border: '1px solid #eaeaea', padding: 20, marginBottom: 20 },
-    btn: (active) => ({
-      padding: '10px 20px',
-      background: active ? '#000' : '#f4f4f5',
-      color: active ? '#fff' : '#666',
-      border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8
-    }),
-    signalRow: (score) => ({
-      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      padding: '12px', borderBottom: '1px solid #f0f0f0',
-      background: score > 75 ? '#e8f5e9' : score < 25 ? '#ffebee' : '#fff'
-    })
-  };
+  const supportedCryptos = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT"];
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      
-      {/* HEADER & CONTROLS */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+    <div className="fade-in" style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto', minHeight: '100vh', position: 'relative' }}>
+
+      {/* BACKGROUND */}
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1 }}>
+        <Scene3D />
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 60% 40%, rgba(0,0,0,0.7), #050505)' }} />
+      </div>
+
+      {/* HEADER */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '50px' }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>AI Sniper <span style={{fontSize:14, color:'#999', fontWeight:400}}>GEN-3.7</span></h1>
-          <p style={{ color: '#666', marginTop: 4 }}>Real-time Opportunity Scanner</p>
+          <h1 className="text-glow" style={{ fontSize: '42px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <Radar size={40} color="var(--neon-cyan)" /> AI Sniper
+          </h1>
+          <p style={{ color: 'var(--text-dim)', fontSize: '16px' }}>Tactical Opportunity Deployment Engine</p>
         </div>
-        
-        <div style={{ display: 'flex', gap: 12 }}>
-          {/* AUTO SWITCH */}
-          <button onClick={() => setAutoMode(!autoMode)} style={s.btn(autoMode)}>
-            <Activity size={18} className={autoMode ? "animate-pulse" : ""} />
-            {autoMode ? 'AUTO SCAN: ON' : 'AUTO SCAN: OFF'}
+
+        <div style={{ display: 'flex', gap: '20px' }}>
+          <button
+            onClick={() => setAutoMode(!autoMode)}
+            className="glass-panel"
+            style={{
+              padding: '15px 30px',
+              display: 'flex', alignItems: 'center', gap: '10px',
+              color: autoMode ? '#00e676' : 'var(--text-dim)',
+              border: autoMode ? '1px solid #00e676' : '1px solid var(--glass-border)',
+              boxShadow: autoMode ? '0 0 20px rgba(0,230,118,0.2)' : 'none'
+            }}
+          >
+            <Activity size={20} className={autoMode ? 'animate-pulse' : ''} />
+            {autoMode ? 'AUTO-HUNT ACTIVE' : 'ENGAGE AUTO-HUNT'}
           </button>
 
-          {/* MANUAL BUTTON */}
           {!autoMode && (
-            <button onClick={runAiScan} disabled={scanning} style={{...s.btn(true), background: '#2962ff'}}>
-              <Radar size={18} className={scanning ? 'animate-spin' : ''} />
-              {scanning ? 'SCANNING...' : 'SCAN NOW'}
+            <button onClick={runAiScan} disabled={scanning} className="btn-premium">
+              {scanning ? 'SCANNING...' : 'MANUAL SCAN'}
             </button>
           )}
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
-        
-        {/* LEWA KOLUMNA: WYNIKI SKANERA */}
-        <div>
-          <div style={s.card}>
-            <h3 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <TrendingUp size={20} color="#2962ff" /> Top Opportunities (Live)
-            </h3>
-            
-            {signals.length === 0 ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#999', background:'#fafafa', borderRadius:8 }}>
-                {scanning ? 'Analyzing Market Structure...' : 'No signals found. Enable Auto Scan or Click "Scan Now".'}
-              </div>
-            ) : (
-              <div>
-                {signals.map((sig, i) => (
-                  <div key={i} style={s.signalRow(sig.score)}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 16 }}>{sig.symbol}</div>
-                      <div style={{ fontSize: 11, color: '#666', marginTop: 4, display:'flex', gap:10 }}>
-                        <span>SCORE: <b>{sig.score}</b></span>
-                        <span>RSI: {sig.rsi}</span>
-                        <span>CONF: {(sig.confidence * 100).toFixed(0)}%</span>
-                      </div>
-                      <div style={{ fontSize: 11, color: '#444', marginTop: 4, fontStyle:'italic' }}>
-                        {sig.reason}
-                      </div>
-                    </div>
-                    
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ 
-                        fontWeight: 800, 
-                        color: sig.signal.includes('BUY') ? '#00c853' : sig.signal.includes('SELL') ? '#d32f2f' : '#666',
-                        marginBottom: 6
-                      }}>
-                        {sig.signal}
-                      </div>
-                      {/* QUICK ACTION BUTTONS */}
-                      {sig.signal !== 'HOLD' && (
-                        <button 
-                          onClick={() => handleTrade(sig.signal.includes('BUY') ? 'BUY' : 'SELL', sig.symbol)}
-                          style={{ padding: '6px 12px', background: '#111', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
-                        >
-                          EXECUTE
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+      {/* MAIN CONTENT */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: '30px' }}>
+
+        {/* LEFT: SIGNAL FEED */}
+        <TiltCard className="glass-panel" style={{ padding: '30px', display: 'flex', flexDirection: 'column' }}>
+          <h3 style={{ marginBottom: '30px', fontWeight: '800', fontSize: '18px', color: 'var(--text-dim)', display: 'flex', gap: '10px' }}>
+            <Target size={20} color="var(--neon-purple)" /> DETECTED SIGNALS
+          </h3>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {scanning && signals.length === 0 && (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
+                <Cpu size={40} className="animate-spin" style={{ marginBottom: '20px' }} />
+                <div>Neural Network Scanning...</div>
               </div>
             )}
+            {!scanning && signals.length === 0 && (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                No high-confidence signals detected.
+              </div>
+            )}
+            <AnimatePresence>
+              {signals.map((sig, i) => (
+                <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: i * 0.1 }} key={i} className="glass-panel" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '20px', fontWeight: '800' }}>{sig.symbol}</span>
+                      <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '4px' }}>CONFIDENCE: {Math.floor((sig.score || sig.confidence) * 100)}%</span>
+                    </div>
+                    <p style={{ color: 'var(--text-dim)', fontSize: '12px', marginTop: '5px' }}>{sig.reason}</p>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
+                    <span style={{ fontSize: '16px', fontWeight: '800', color: sig.signal.includes('BUY') ? '#00e676' : '#ff3d00' }}>
+                      {sig.signal}
+                    </span>
+                    {sig.signal !== 'HOLD' && (
+                      <button onClick={() => handleTrade(sig.signal.includes('BUY') ? 'BUY' : 'SELL', sig.symbol)} className="glow-btn" style={{ padding: '6px 16px', fontSize: '11px' }}>
+                        EXECUTE
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
-        </div>
+        </TiltCard>
 
-        {/* PRAWA KOLUMNA: PORTFEL & MANUAL */}
-        <div>
-          {/* MANUAL ENTRY */}
-          <div style={s.card}>
-            <h3 style={{ margin: '0 0 16px 0' }}>Manual Entry</h3>
-            <input 
-              value={symbol} onChange={e => setSymbol(e.target.value.toUpperCase())} 
-              placeholder="BTC/USDT"
-              style={{ width: '100%', padding: 10, marginBottom: 12, borderRadius: 6, border: '1px solid #ddd' }}
-            />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <button onClick={() => handleTrade('BUY')} style={{ padding: 12, background: '#00c853', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}>LONG</button>
-              <button onClick={() => handleTrade('SELL')} style={{ padding: 12, background: '#d32f2f', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}>SHORT</button>
+        {/* RIGHT: MANUAL & POSITIONS */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+
+          {/* MANUAL OVERRIDE */}
+          <TiltCard className="glass-panel" style={{ padding: '30px' }}>
+            <h3 style={{ marginBottom: '20px', fontSize: '14px', fontWeight: '800', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Manual Override</h3>
+            <select
+              value={symbol} onChange={e => setSymbol(e.target.value)}
+              style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--glass-border)', color: '#fff', borderRadius: '8px', marginBottom: '20px', cursor: 'pointer' }}
+            >
+              {supportedCryptos.map(c => <option key={c} value={c} style={{ background: '#000' }}>{c}</option>)}
+            </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button onClick={() => handleTrade('BUY')} className="glass-panel hover:bg-green-900/20" style={{ padding: '15px', color: '#00e676', fontWeight: '800', cursor: 'pointer' }}>LONG</button>
+              <button onClick={() => handleTrade('SELL')} className="glass-panel hover:bg-red-900/20" style={{ padding: '15px', color: '#ff3d00', fontWeight: '800', cursor: 'pointer' }}>SHORT</button>
             </div>
-          </div>
+          </TiltCard>
 
           {/* POSITIONS */}
-          <div style={s.card}>
-            <h3 style={{ margin: '0 0 16px 0' }}>Positions</h3>
-            {safePositions.length === 0 && <div style={{ fontSize: 13, color: '#999' }}>Flat. No exposure.</div>}
-            {safePositions.map((p, i) => (
-              <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid #eee', fontSize: 13, display:'flex', justifyContent:'space-between' }}>
-                <span>{p.symbol}</span>
-                <span style={{ fontWeight: 600 }}>{p.size}</span>
-              </div>
-            ))}
+          <div className="glass-panel" style={{ padding: '30px', flex: 1 }}>
+            <h3 style={{ marginBottom: '20px', fontSize: '14px', fontWeight: '800', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Crosshair size={18} /> OPEN POSITIONS
+            </h3>
+            {positions.length === 0 ? (
+              <div style={{ color: 'var(--text-dim)', fontSize: '13px', textAlign: 'center' }}>No active exposures</div>
+            ) : (
+              positions.map((p, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid var(--glass-border)' }}>
+                  <span style={{ fontWeight: '700' }}>{p.symbol}</span>
+                  <span style={{ color: 'var(--neon-gold)' }}>{p.size}</span>
+                </div>
+              ))
+            )}
           </div>
-        </div>
 
+        </div>
       </div>
+
     </div>
   );
 };

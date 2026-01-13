@@ -4,7 +4,6 @@ import time
 from core.security import HardwareSecurity
 from security.user_manager import UserManager
 
-
 def render_auth():
     """
     REDLINE AUTH GATE

@@ -12,8 +12,8 @@ export const useHud = () => {
 
   useEffect(() => {
     const connect = () => {
-      // Łączymy się z Twoim Backendem (przez Proxy z vite.config.js)
-      ws.current = new WebSocket('ws://localhost:3000/ws/hud');
+      // Bezpośrednie połączenie z backendem (omijamy proxy, żeby wykluczyć błędy)
+      ws.current = new WebSocket('ws://localhost:8000/ws/hud');
 
       ws.current.onopen = () => {
         setConnected(true);

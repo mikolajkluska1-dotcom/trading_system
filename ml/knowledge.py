@@ -22,18 +22,18 @@ class KnowledgeBase:
             try:
                 with open(db_file, "r") as f: data = json.load(f)
             except: data = []
-        
+
         record = features.copy()
-        record['target'] = label 
+        record['target'] = label
         record['ts'] = datetime.now().isoformat()
-        record['ver'] = "V4.5" 
-        
+        record['ver'] = "V4.5"
+
         data.append(record)
-        
+
         if len(data) > KnowledgeBase.MAX_RECORDS:
             excess = len(data) - KnowledgeBase.MAX_RECORDS
             data = data[excess:]
-        
+
         try:
             with open(db_file, "w") as f: json.dump(data, f, indent=4)
         except Exception: return 0
@@ -47,7 +47,7 @@ class KnowledgeBase:
             with open(db_file, "r") as f: data = json.load(f)
             return pd.DataFrame(data)
         except: return pd.DataFrame()
-    
+
     @staticmethod
     def clear_memory(user):
         db_file = KnowledgeBase._get_db_path(user)

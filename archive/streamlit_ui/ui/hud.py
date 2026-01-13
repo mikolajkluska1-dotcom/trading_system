@@ -22,7 +22,6 @@ def render_hud():
         const hud = document.getElementById("hud-bar");
         const ws = new WebSocket("ws://127.0.0.1:8001/ws/hud");
 
-
         function color(v){
             if(v >= 80) return "#7f1d1d";
             if(v >= 60) return "#92400e";

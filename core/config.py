@@ -4,13 +4,13 @@
 
 # --- SYSTEM DEPENDENCIES (FIX BŁĘDU IMPORTU) ---
 REQUIRED_LIBS = [
-    "streamlit", 
-    "pandas", 
-    "numpy", 
-    "ccxt", 
-    "yfinance", 
-    "ta", 
-    "textblob", 
+    "streamlit",
+    "pandas",
+    "numpy",
+    "ccxt",
+    "yfinance",
+    "ta",
+    "textblob",
     "plotly",
     "torch",
     "sklearn"

@@ -3,7 +3,6 @@ import json
 import uuid
 from datetime import datetime as dt
 
-
 class EventLogger:
     """
     OPS ANALYTICS CORE.

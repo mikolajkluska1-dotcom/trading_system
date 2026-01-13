@@ -1,8 +1,11 @@
 from datetime import datetime, time
+import pandas as pd
 from trading.wallet import WalletManager
 from trading.capital import CapitalGuard
 from data.feed import DataFeed
-from core.event_logger import EventLogger  # <--- NOWOŚĆ
+from data.feed import DataFeed
+from core.event_logger import EventLogger
+from ml.sentiment import SentimentOracle # <--- Oracle
 
 class DecisionEngine:
     """
@@ -14,10 +17,10 @@ class DecisionEngine:
         self.mode = mode
         self.max_concurrent_positions = 3
         self.min_confidence = 0.60
-        
+
         self.COOLDOWN_MINUTES = 60
-        self.SESSION_START = time(7, 0)  
-        self.SESSION_END = time(21, 0)   
+        self.SESSION_START = time(7, 0)
+        self.SESSION_END = time(21, 0)
 
     def _check_session(self):
         now = datetime.utcnow().time()
@@ -26,13 +29,13 @@ class DecisionEngine:
     def _check_cooldown(self, symbol):
         wallet = WalletManager.get_wallet_data()
         history = wallet.get('history', [])
-        
+
         last_trade_ts = None
         for trade in reversed(history):
             if isinstance(trade, dict) and trade.get('symbol') == symbol:
                 last_trade_ts = trade.get('ts')
                 break
-        
+
         if last_trade_ts:
             try:
                 # Obsługa formatu ISO z EventLoggera lub prostego czasu
@@ -43,12 +46,43 @@ class DecisionEngine:
                     last_dt = datetime.strptime(last_trade_ts, "%H:%M:%S")
                     now = datetime.now()
                     last_dt = last_dt.replace(year=now.year, month=now.month, day=now.day)
-                
+
                 diff = (datetime.now() - last_dt).total_seconds() / 60
                 if diff < self.COOLDOWN_MINUTES:
                     return False, f"COOLDOWN ({int(diff)}m)"
             except: pass
+
+        return True, "OK"
+
+    def _check_correlation(self, new_symbol, threshold=0.85):
+        """Sprawdza korelację z obecnym portfolio."""
+        wallet = WalletManager.get_wallet_data()
+        assets = [a['sym'] for a in wallet.get('assets', []) if a['sym'] != new_symbol]
+        
+        if not assets: return True, "Empty Portfolio"
+        
+        try:
+            # 1. Pobierz dane dla nowego symbolu
+            df_new = DataFeed.get_market_data(new_symbol, "1h", limit=48)
+            if df_new.empty: return True, "No Data"
+            
+            # 2. Sprawdź każdy active asset
+            for asset in assets:
+                df_asset = DataFeed.get_market_data(asset, "1h", limit=48)
+                if df_asset.empty: continue
                 
+                # Wyrównanie indeksów (proste przycięcie)
+                min_len = min(len(df_new), len(df_asset))
+                s1 = df_new['close'].iloc[-min_len:].reset_index(drop=True)
+                s2 = df_asset['close'].iloc[-min_len:].reset_index(drop=True)
+                
+                corr = s1.corr(s2)
+                if corr > threshold:
+                    return False, f"Risk: High Corr with {asset} ({corr:.2f})"
+                    
+        except Exception as e:
+            return True, f"Corr Error: {e}"
+            
         return True, "OK"
 
     def evaluate_entry(self, candidate, risk_status=True):
@@ -59,7 +93,7 @@ class DecisionEngine:
         symbol = candidate['symbol']
         signal = candidate['signal']
         signal_id = candidate.get('signal_id', 'MANUAL') # Pobieramy ID ze skanera
-        
+
         reasons = []
         checks = {}
         approved = False
@@ -94,12 +128,19 @@ class DecisionEngine:
             if symbol in curr_assets:
                 final_reason = "ALREADY_IN_POS"
                 raise StopIteration
-            
+
             if len(curr_assets) >= self.max_concurrent_positions:
                 final_reason = "MAX_SLOTS_FULL"
                 raise StopIteration
 
-            # 5. Price & Size
+            # 5. Correlation Check (The Guard)
+            corr_ok, corr_msg = self._check_correlation(symbol)
+            checks['correlation'] = corr_ok
+            if not corr_ok:
+                final_reason = corr_msg
+                raise StopIteration
+
+            # 6. Price & Size
             price = candidate.get('current_price', 0)
             if price <= 0:
                 try:
@@ -112,6 +153,16 @@ class DecisionEngine:
             balance = wallet.get('balance', 0)
             mqs = candidate.get('mqs', 50)
             
+            # --- ORACLE SENTIMENT ADJUSTMENT ---
+            sent_mult, sent_msg = SentimentOracle.get_sentiment_bias()
+            
+            # Jeśli mamy Extreme Fear, pozwalamy na nieco większe ryzyko (kupno dołka)
+            # Jeśli Extreme Greed, ucinamy size
+            
+            if sent_mult != 1.0:
+                 mqs = int(mqs * sent_mult)
+                 checks['sentiment'] = sent_msg
+
             size, _ = CapitalGuard.calculate_position_size(balance, price, mqs)
             if size < 10:
                 final_reason = "SIZE_TOO_SMALL"
@@ -136,6 +187,5 @@ class DecisionEngine:
             checks=checks
         )
         DecisionCore = DecisionEngine
-
 
         return approved, final_reason, size_usd

@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # --- SERCE SYSTEMU (BACKEND) ---
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: redline_backend
+    volumes:
+      - .:/app  # Hot-reloading: zmiany w kodzie na dysku od razu widać w kontenerze
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Tu w przyszłości wpadną klucze z Vaulta
+      # - BINANCE_API_KEY=... 
+    networks:
+      - trading_net
+
+  # --- KOKPIT (FRONTEND) ---
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: redline_frontend
+    volumes:
+      - ./frontend/src:/app/src  # Hot-reloading frontendu
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - trading_net
+
+# Sieć wewnętrzna, żeby kontenery widziały się po nazwach
+networks:
+  trading_net:
+    driver: bridge
