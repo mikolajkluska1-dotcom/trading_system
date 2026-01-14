@@ -13,7 +13,7 @@ from pathlib import Path
 
 def print_banner():
     print("\n" + "="*60)
-    print("🚀 REDLINE Trading System - Startup Launcher")
+    print("REDLINE Trading System - Startup Launcher")
     print("="*60 + "\n")
 
 def get_base_dir():
@@ -26,7 +26,7 @@ def start_services():
     frontend_dir = base_dir / "frontend"
     is_windows = platform.system() == "Windows"
     
-    print("📡 Starting Backend Server...")
+    print("Starting Backend Server...")
     print(f"   Directory: {base_dir}")
     print(f"   Command: uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000\n")
     
@@ -41,7 +41,7 @@ def start_services():
     # Wait a moment for backend to initialize
     time.sleep(2)
     
-    print("🎨 Starting Frontend Dev Server...")
+    print("Starting Frontend Dev Server...")
     print(f"   Directory: {frontend_dir}")
     print(f"   Command: npm run dev\n")
     
@@ -54,12 +54,12 @@ def start_services():
     )
     
     print("\n" + "="*60)
-    print("✅ Services Started!")
+    print("Services Started!")
     print("="*60)
-    print("\n📍 Access Points:")
+    print("\nAccess Points:")
     print("   Backend API:  http://localhost:8000")
     print("   Frontend UI:  http://localhost:5173")
-    print("\n💡 Press Ctrl+C to stop both services\n")
+    print("\nPress Ctrl+C to stop both services\n")
     
     try:
         # Keep the script running and monitor both processes
@@ -81,7 +81,7 @@ def start_services():
             time.sleep(1)
     
     except KeyboardInterrupt:
-        print("\n\n🛑 Shutting down services...")
+        print("\n\nShutting down services...")
         backend_process.terminate()
         frontend_process.terminate()
         
@@ -89,7 +89,7 @@ def start_services():
         backend_process.wait(timeout=5)
         frontend_process.wait(timeout=5)
         
-        print("✅ Services stopped successfully!")
+        print("Services stopped successfully!")
         sys.exit(0)
 
 def main():
@@ -98,13 +98,13 @@ def main():
     # Check if we're in the right directory
     base_dir = get_base_dir()
     if not (base_dir / "backend").exists():
-        print("❌ Error: 'backend' directory not found!")
+        print("Error: 'backend' directory not found!")
         print(f"   Current path: {base_dir}")
         print("   Please run this script from the trading_system root directory.")
         sys.exit(1)
     
     if not (base_dir / "frontend").exists():
-        print("❌ Error: 'frontend' directory not found!")
+        print("Error: 'frontend' directory not found!")
         print(f"   Current path: {base_dir}")
         sys.exit(1)
     
@@ -112,7 +112,7 @@ def main():
     try:
         subprocess.run(["uvicorn", "--version"], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ Error: uvicorn not found!")
+        print("Error: uvicorn not found!")
         print("   Install it with: pip install uvicorn")
         sys.exit(1)
     
@@ -126,7 +126,7 @@ def main():
             shell=is_windows
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ Error: npm not found!")
+        print("Error: npm not found!")
         print("   Please install Node.js and npm first.")
         sys.exit(1)
     

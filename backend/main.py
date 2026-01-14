@@ -61,9 +61,9 @@ async def trading_background_loop():
     import logging
     logger = logging.getLogger("TRADING_LOOP")
     
-    print(" 🚀 STARTING BACKGROUND TRADING LOOP...")
-    print(f" ℹ️  Initial orchestrator.is_running: {orchestrator.is_running}")
-    logger.info(" 🚀 Background Trading Loop Started")
+    print(" STARTING BACKGROUND TRADING LOOP...")
+    print(f" Info: Initial orchestrator.is_running: {orchestrator.is_running}")
+    logger.info(" Background Trading Loop Started")
     
     heartbeat_counter = 0
     
@@ -73,21 +73,21 @@ async def trading_background_loop():
             heartbeat_counter += 1
             current_time = datetime.now().strftime('%H:%M:%S')
             
-            logger.info(f" ❤️  AI LOOP ALIVE | Heartbeat #{heartbeat_counter} | Time: {current_time} | Status: {'ONLINE' if orchestrator.is_running else 'STANDBY'}")
-            print(f"\n⏰ [LOOP HEARTBEAT #{heartbeat_counter}] Time: {current_time}")
-            print(f"   📊 AI Status: {'🟢 ONLINE' if orchestrator.is_running else '🔴 STANDBY'}")
-            print(f"   🔧 orchestrator.is_running = {orchestrator.is_running}")
-            print(f"   🎯 About to call orchestrator.run_cycle()...")
+            logger.info(f" AI LOOP ALIVE | Heartbeat #{heartbeat_counter} | Time: {current_time} | Status: {'ONLINE' if orchestrator.is_running else 'STANDBY'}")
+            print(f"\n[LOOP HEARTBEAT #{heartbeat_counter}] Time: {current_time}")
+            print(f"   AI Status: {'ONLINE' if orchestrator.is_running else 'STANDBY'}")
+            print(f"   orchestrator.is_running = {orchestrator.is_running}")
+            print(f"   About to call orchestrator.run_cycle()...")
             
             # Call async run_cycle which checks is_running internally
             await orchestrator.run_cycle()
             
-            logger.info(f" ✅ Cycle completed. Waiting 10 seconds...")
-            print(f"   ✅ Cycle completed successfully.\n")
+            logger.info(f" Cycle completed. Waiting 10 seconds...")
+            print(f"   Cycle completed successfully.\n")
             
         except Exception as e:
-            logger.error(f" ❌ ORCHESTRATOR ERROR: {e}")
-            print(f"  ❌ ORCHESTRATOR ERROR: {e}")
+            logger.error(f" ORCHESTRATOR ERROR: {e}")
+            print(f"  ORCHESTRATOR ERROR: {e}")
             import traceback
             traceback.print_exc()
         
@@ -103,13 +103,13 @@ async def whale_poller_loop():
     """
     Background Task: Scan tracked whales for new on-chain activity.
     """
-    print(" 🐋 WHALE POLLER STARTED")
+    print(" WHALE POLLER STARTED")
     while True:
         try:
             # Run blocking I/O in thread pool to not block asyncio
             await asyncio.to_thread(ai_core.whale_watcher.scan_chain_activity)
         except Exception as e:
-            print(f" 🐋 Poll Error: {e}")
+            print(f" Poll Error: {e}")
             
         await asyncio.sleep(60) # Chech every 60s
 
@@ -124,12 +124,12 @@ async def binance_ws_loop():
     import websockets
     
     uri = "wss://stream.binance.com:9443/ws/!miniTicker@arr"
-    print(" 🔌 CONNECTING TO BINANCE WEBSOCKET...")
+    print(" CONNECTING TO BINANCE WEBSOCKET...")
     
     while True:
         try:
             async with websockets.connect(uri) as ws:
-                print(" ✅ WS CONNECTED (Real-Time Data)")
+                print(" WS CONNECTED (Real-Time Data)")
                 while True:
                     msg = await ws.recv()
                     data = json.loads(msg)
@@ -151,7 +151,7 @@ async def binance_ws_loop():
                             orchestrator.on_tick(tick_payload)
                             
         except Exception as e:
-            print(f" ⚠️ WS DISCONNECTED: {e}. Reconnecting in 5s...")
+            print(f" WS DISCONNECTED: {e}. Reconnecting in 5s...")
             await asyncio.sleep(5)
 
 # =====================================================

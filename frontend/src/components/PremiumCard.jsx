@@ -10,10 +10,10 @@ export const PremiumCard = ({ children, className, spotlight = true, ...props })
             transition={{ duration: 0.4, ease: "easeOut" }}
             className={cn(
                 "relative overflow-hidden rounded-3xl",
-                "bg-gradient-to-b from-white/5 to-white/[0.02]",
-                "border border-white/10",
-                "backdrop-blur-2xl",
-                "shadow-[0_8px_32px_0_rgba(0,0,0,0.36)]",
+                "bg-[#0F0F11]/80", // Surface Color
+                "border border-white/5", // Subtle Border
+                "backdrop-blur-xl",
+                "shadow-[0_8px_32px_0_rgba(0,0,0,0.5)]", // Deeper shadow
                 "group",
                 className
             )}

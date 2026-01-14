@@ -1,126 +1,124 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import {
-  Send,
-  CheckCircle,
-  ArrowRight,
-  Loader2,
-  ShieldCheck,
-  Zap,
-  BarChart3,
-  Lock,
-  Globe,
-  Settings,
-  Target,
-  Cpu,
-  TrendingUp,
-  Activity,
-  ChevronRight,
-  Radar
-} from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line
-} from 'recharts';
-import { motion } from 'framer-motion';
-import Scene3D from '../components/Scene3D';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Loader2, ArrowRight, Lock, Activity, TrendingUp, Zap, ShieldCheck, Cpu, Server, Code, Database, Globe, CheckCircle, X, User, FileText, Briefcase, Mail, Phone, AlertTriangle } from 'lucide-react';
+import { createChart, ColorType, CandlestickSeries } from 'lightweight-charts';
 
-// --- MOCK DATA ---
-const aiLogicData = [
-  { time: '00:00', raw: 45, filtered: 48, confidence: 70 },
-  { time: '04:00', raw: 52, filtered: 50, confidence: 65 },
-  { time: '08:00', raw: 38, filtered: 42, confidence: 80 },
-  { time: '12:00', raw: 65, filtered: 58, confidence: 85 },
-  { time: '16:00', raw: 48, filtered: 52, confidence: 75 },
-  { time: '20:00', raw: 70, filtered: 62, confidence: 90 },
-  { time: '23:59', raw: 55, filtered: 54, confidence: 88, glow: true },
-];
-
-const cryptoTicker = [
-  { symbol: 'BTC', price: '64,231.50', change: '+2.4%' },
-  { symbol: 'ETH', price: '3,421.20', change: '+1.8%' },
-  { symbol: 'SOL', price: '142.15', change: '+5.2%' },
-  { symbol: 'BNB', price: '582.40', change: '-0.3%' },
-  { symbol: 'LINK', price: '18.90', change: '+3.1%' },
-  { symbol: 'AVAX', price: '52.10', change: '+4.5%' },
-];
-
-const TiltCard = ({ children, style }) => {
-  const cardRef = useRef(null);
+// --- 1. SPOTLIGHT CARD COMPONENT ---
+const SpotlightCard = ({ children, className = "", onClick }) => {
+  const divRef = useRef(null);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [opacity, setOpacity] = useState(0);
 
   const handleMouseMove = (e) => {
-    const card = cardRef.current;
-    if (!card) return;
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const rotateX = (y - centerY) / 20;
-    const rotateY = (centerX - x) / 20;
-
-    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
-  };
-
-  const handleMouseLeave = () => {
-    const card = cardRef.current;
-    if (!card) return;
-    card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+    if (!divRef.current) return;
+    const rect = divRef.current.getBoundingClientRect();
+    setPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top });
   };
 
   return (
     <div
-      ref={cardRef}
+      ref={divRef}
+      onClick={onClick}
       onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      className="glass glass-hover"
-      style={{
-        ...style,
-        transition: 'transform 0.1s ease-out, box-shadow 0.3s ease',
-        transformStyle: 'preserve-3d'
-      }}
+      onMouseEnter={() => setOpacity(1)}
+      onMouseLeave={() => setOpacity(0)}
+      className={`relative overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-xl transition-all duration-300 hover:border-white/20 ${className}`}
     >
-      <div style={{ transform: 'translateZ(30px)' }}>
-        {children}
-      </div>
+      <div
+        className="pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-300"
+        style={{
+          opacity,
+          background: `radial-gradient(600px circle at ${position.x}px ${position.y}px, rgba(255,255,255,0.06), transparent 40%)`,
+        }}
+      />
+      <div className="relative z-10 h-full">{children}</div>
     </div>
   );
 };
 
-const Login = () => {
-  const { login, error: authError } = useAuth();
-
-  // Navigation & View State
-  const [showAuth, setShowAuth] = useState(false);
-  const [authTab, setAuthTab] = useState('login');
-
-  // Login States
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  // Request States
-  const [reqData, setReqData] = useState({ fullName: '', phone: '', email: '', about: '' });
-  const [reqStatus, setReqStatus] = useState({ sent: false, error: null });
-
-  // Parallax Logic
-  const sidebarRef = useRef(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+// --- 2. LIVE CANDLE CHART COMPONENT ---
+const LiveCandleChart = () => {
+  const chartContainerRef = useRef();
 
   useEffect(() => {
-    const handleGlobalMouse = (e) => {
-      setMousePos({ x: (e.clientX / window.innerWidth - 0.5) * 40, y: (e.clientY / window.innerHeight - 0.5) * 40 });
+    if (!chartContainerRef.current) return;
+
+    const chart = createChart(chartContainerRef.current, {
+      layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: '#6b7280' },
+      grid: { vertLines: { color: 'rgba(255,255,255,0.05)' }, horzLines: { color: 'rgba(255,255,255,0.05)' } },
+      width: chartContainerRef.current.clientWidth,
+      height: 400,
+      timeScale: { timeVisible: true, secondsVisible: true },
+    });
+
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
+      upColor: '#eab308', downColor: '#ef4444', borderVisible: false, wickUpColor: '#eab308', wickDownColor: '#ef4444',
+    });
+
+    // Generate initial history
+    let data = [];
+    let time = Math.floor(Date.now() / 1000) - 10000;
+    let value = 64000;
+    for (let i = 0; i < 100; i++) {
+      let open = value;
+      let close = value + (Math.random() - 0.5) * 100;
+      let high = Math.max(open, close) + Math.random() * 50;
+      let low = Math.min(open, close) - Math.random() * 50;
+      data.push({ time: time + i * 60, open, high, low, close });
+      value = close;
+    }
+    candlestickSeries.setData(data);
+
+    // SIMULATE LIVE TICKS
+    const interval = setInterval(() => {
+      const lastCandle = data[data.length - 1];
+      const newValue = lastCandle.close + (Math.random() - 0.5) * 20;
+      const updatedCandle = {
+        ...lastCandle,
+        close: newValue,
+        high: Math.max(lastCandle.high, newValue),
+        low: Math.min(lastCandle.low, newValue),
+      };
+      candlestickSeries.update(updatedCandle);
+      data[data.length - 1] = updatedCandle;
+    }, 200);
+
+    const handleResize = () => chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('resize', handleResize);
+      chart.remove();
     };
-    window.addEventListener('mousemove', handleGlobalMouse);
-    return () => window.removeEventListener('mousemove', handleGlobalMouse);
   }, []);
+
+  return <div ref={chartContainerRef} className="w-full h-full" />;
+};
+
+// --- DATA ---
+const tickers = ["BTC-PERP", "ETH-USDT", "SOL-USD", "XRP-LEDGER", "BNB-CHAIN", "ADA-NODE", "AVAX-C", "MATIC-POS"];
+
+// --- 3. MAIN COMPONENT ---
+const Login = () => {
+  const { login, error } = useAuth();
+
+  // STATE
+  const [view, setView] = useState('landing');
+  const [loading, setLoading] = useState(false);
+
+  // Login State
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+
+  // Application Form State
+  const [formData, setFormData] = useState({
+    firstName: '', lastName: '', email: '', phone: '',
+    country: '', experience: '', reason: '', bio: '',
+    liabilityAccepted: false
+  });
+  const [appStatus, setAppStatus] = useState('idle');
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -129,509 +127,211 @@ const Login = () => {
     setLoading(false);
   };
 
-  const handleRequest = async (e) => {
+  const handleAppSubmit = (e) => {
     e.preventDefault();
-    setLoading(true);
-    setReqStatus({ sent: false, error: null });
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reqData),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Request failed');
-      setReqStatus({ sent: true, error: null });
-    } catch (err) {
-      setReqStatus({ sent: false, error: err.message });
-    }
-    setLoading(false);
+    if (!formData.liabilityAccepted) return; // Extra safety check
+    setAppStatus('sending');
+    setTimeout(() => {
+      setAppStatus('success');
+    }, 2000);
   };
 
   return (
-    <div className="min-h-screen w-full relative flex flex-col overflow-x-hidden">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
-        html { scroll-behavior: smooth; }
-        
-        .hero-title-gradient {
-            background: linear-gradient(180deg, #FFFFFF 0%, #A0A0A0 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 20px 80px rgba(255,255,255,0.15);
-        }
-        
-        @keyframes tickerScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        
-        /* COIN CARD CONTAINER - PREVENT OVERFLOW */
-        .coin-card-container {
-          position: relative;
-          overflow: hidden;
-          width: 100%;
-          height: 100%;
-        }
-        
-        /* TEXT CONTENT CENTERING */
-        .coin-card-text {
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          text-align: center;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          z-index: 2;
-        }
-        
-        /* RESPONSIVE CARD TITLES */
-        .coin-card-title {
-          font-size: clamp(1.5rem, 3vw, 2rem);
-          font-weight: 800;
-          margin-bottom: 12px;
-          line-height: 1.2;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          width: 100%;
-        }
-        
-        /* RESPONSIVE CARD TEXT */
-        .coin-card-description {
-          font-size: clamp(0.9rem, 1.5vw, 1.1rem);
-          line-height: 1.6;
-          color: var(--text-dim);
-          overflow: hidden;
-          width: 100%;
-        }
-        
-        /* BACKGROUND ICON POSITIONING */
-        .window-bg-icon { 
-          position: absolute; 
-          top: -20px; 
-          right: -20px; 
-          opacity: 0.03; 
-          font-size: 200px; 
-          transform: rotate(-15deg);
-          pointer-events: none;
-          z-index: 0;
-        }
+    <div className="min-h-screen w-full bg-[#050505] text-white font-sans selection:bg-purple-500/30 overflow-x-hidden relative">
 
-        /* SCI-FI HOLO EFFECTS */
-        @keyframes scan { 
-            0% { top: 0%; opacity: 0; } 
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { top: 100%; opacity: 0; } 
-        }
-        .laser-scan {
-            position: absolute; left: 0; width: 100%; height: 2px;
-            background: linear-gradient(90deg, transparent, var(--neon-gold), transparent);
-            box-shadow: 0 0 10px var(--neon-gold);
-            animation: scan 3s linear infinite;
-            z-index: 10;
-        }
-        
-        @keyframes pulse-dot { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(3); opacity: 0; } }
-        .pulse-marker {
-            position: absolute; width: 8px; height: 8px; background: var(--neon-gold); borderRadius: 50%;
-        }
-        .pulse-ring {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            border: 1px solid var(--neon-gold); borderRadius: 50%;
-            animation: pulse-dot 2s infinite ease-out;
-        }
-        
-        .glitch-text:hover {
-            animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite;
-            color: var(--neon-gold);
-        }
-        @keyframes glitch {
-            0% { transform: translate(0) }
-            20% { transform: translate(-2px, 2px) }
-            40% { transform: translate(-2px, -2px) }
-            60% { transform: translate(2px, 2px) }
-            80% { transform: translate(2px, -2px) }
-            100% { transform: translate(0) }
-        }
+      {/* GLOBAL BACKGROUND */}
+      <div className="fixed top-[-20%] left-[-10%] w-[800px] h-[800px] bg-purple-900/15 rounded-full blur-[150px] pointer-events-none z-0" />
+      <div className="fixed bottom-[-20%] right-[-10%] w-[800px] h-[800px] bg-blue-900/10 rounded-full blur-[150px] pointer-events-none z-0" />
 
-        /* SHIMMER BUTTON EFFECT */
-        .shimmer-btn {
-          position: relative;
-          overflow: hidden;
-          background: rgba(0,0,0,0.5);
-          border: 1px solid var(--neon-gold);
-          color: var(--neon-gold);
-          transition: all 0.3s ease;
-        }
-        .shimmer-btn::before {
-          content: '';
-          position: absolute;
-          top: 0; left: -100%;
-          width: 50%; height: 100%;
-          background: linear-gradient(120deg, transparent, rgba(226, 183, 20, 0.4), transparent);
-          transform: skewX(-25deg);
-          transition: 0.5s;
-        }
-        .shimmer-btn:hover::before { left: 100%; transition: 0.5s; }
-        .shimmer-btn:hover {
-          box-shadow: 0 0 20px rgba(226, 183, 20, 0.4);
-          text-shadow: 0 0 8px rgba(226, 183, 20, 0.8);
-          transform: translateY(-2px);
-        }
+      <AnimatePresence>
+        {view === 'landing' && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.5 }}
+            className="relative z-10"
+          >
+            {/* --- HERO SECTION --- */}
+            <div className="relative min-h-screen flex flex-col items-center justify-center p-6">
+              <div className="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-2 gap-20 items-center mt-10">
+                {/* Brand */}
+                <div className="space-y-10">
+                  <div>
+                    <div className="flex items-center gap-3 mb-6 opacity-70">
+                      <div className="p-1.5 bg-yellow-500/10 rounded border border-yellow-500/20">
+                        <Activity className="text-yellow-400" size={20} />
+                      </div>
+                      <span className="text-sm font-bold tracking-[0.3em] text-gray-300 uppercase">Redline Systems v4.0</span>
+                    </div>
+                    <h1 className="text-7xl md:text-8xl font-black tracking-tighter leading-[0.9]">
+                      Trade the <br />
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-600">
+                        Invisible.
+                      </span>
+                    </h1>
+                    <p className="mt-8 text-xl text-gray-500 font-light max-w-lg leading-relaxed">
+                      Institutional execution grade AI. Access restricted to verified operators only.
+                    </p>
+                  </div>
+                </div>
 
-        /* TEXT REVEAL */
-        @keyframes reveal { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
-        .reveal-text { animation: reveal 1s ease forwards; }
-      `}</style>
-
-      {/* BACKGROUND SCENE */}
-      <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0, overflow: 'hidden' }}>
-        <motion.div
-          initial={{ scale: 1.1, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 1.5 }}
-          style={{ width: '100%', height: '100%' }}
-        >
-          <Scene3D />
-        </motion.div>
-      </div>
-
-      {/* --- NAVIGATION --- */}
-      <nav className="glass-panel" style={{ padding: '32px 60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, position: 'absolute', width: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer' }} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <img src="/assets/logo_main.jpg" alt="Redline Logo" style={{ height: '40px', borderRadius: '8px' }} />
-          <span style={{ fontSize: '18px', fontWeight: '700', letterSpacing: '1px', color: '#fff' }}>REDLINE</span>
-        </div>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => {
-            setShowAuth(true);
-            setAuthTab('login');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className="glass-panel"
-          style={{ padding: '14px 36px', borderRadius: '100px', fontSize: '14px', zIndex: 20, color: '#fff', fontWeight: '600', cursor: 'pointer' }}
-        >
-          Operator Login
-        </motion.button>
-      </nav>
-
-      {/* --- HERO SECTION --- */}
-      <section style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 40px', position: 'relative', zIndex: 1 }}>
-        <motion.div
-          initial={{ y: 40, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="glass-panel"
-          style={{
-            zIndex: 10,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            maxWidth: '1200px',
-            width: '100%',
-            textAlign: 'center',
-            padding: '60px 40px',
-            background: 'rgba(10, 10, 12, 0.3)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255,255,255,0.05)'
-          }}
-        >
-          {/* TITLE */}
-          <h1 style={{ fontSize: 'clamp(4rem, 12vw, 7.5rem)', fontWeight: '800', lineHeight: '0.95', marginBottom: '24px', letterSpacing: '-2px', textAlign: 'center', width: '100%' }} className="hero-title-gradient">
-            Trade the <br /><span style={{ color: 'var(--neon-gold)', WebkitTextFillColor: 'initial' }}>Invisible</span>.
-          </h1>
-
-          {/* BADGE */}
-          <div className="glass-panel" style={{ padding: '12px 28px', borderRadius: '100px', fontSize: '13px', color: 'var(--neon-gold)', fontWeight: '700', marginBottom: '40px', letterSpacing: '3px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0,0,0,0.5)' }}>
-            <span style={{ width: '8px', height: '8px', background: 'var(--neon-gold)', borderRadius: '50%', boxShadow: '0 0 10px var(--neon-gold)' }}></span>
-            Institutional AI Core
-          </div>
-
-          {/* DESCRIPTION */}
-          <div className="glass-panel" style={{ padding: '30px', borderRadius: '24px', marginBottom: '56px', maxWidth: '800px', width: '90%', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }}>
-            <p style={{ fontSize: '20px', color: 'rgba(255,255,255,0.9)', lineHeight: '1.6', fontWeight: '400', margin: 0, textAlign: 'center' }}>
-              Unleash the power of Neural Regime Detection. Our AI extracts signal from chaos, executing with millisecond precision in any market condition.
-            </p>
-          </div>
-
-          {/* BUTTONS */}
-          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', width: '100%', flexWrap: 'wrap', position: 'relative', zIndex: 10 }}>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => { setShowAuth(true); setAuthTab('request'); }}
-              className="shimmer-btn glass-panel"
-              style={{ padding: '16px 40px', fontSize: '16px', borderRadius: '100px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              Request Access
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05, background: 'rgba(255,255,255,0.15)' }}
-              whileTap={{ scale: 0.95 }}
-              className="glass-panel"
-              style={{ padding: '16px 40px', borderRadius: '100px', color: '#fff', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid rgba(255,255,255,0.2)' }}
-              onClick={() => document.getElementById('three-windows').scrollIntoView({ behavior: 'smooth' })}
-            >
-              Tech Stack <ChevronRight size={18} />
-            </motion.button>
-          </div>
-        </motion.div>
-      </section>
-
-      {/* --- CRYPTO TICKER --- */}
-      <div style={{ width: '100%', padding: '24px 0', background: 'rgba(0,0,0,0.4)', borderTop: '1px solid var(--glass-border)', borderBottom: '1px solid var(--glass-border)', overflow: 'hidden', display: 'flex' }}>
-        <div style={{ display: 'flex', gap: '80px', animation: 'tickerScroll 30s linear infinite', whiteSpace: 'nowrap' }}>
-          {[...cryptoTicker, ...cryptoTicker].map((c, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '15px', fontSize: '15px', fontWeight: '700' }}>
-              <span style={{ color: 'var(--text-dim)', opacity: 0.6 }}>{c.symbol}</span>
-              <span style={{ color: '#fff' }}>${c.price}</span>
-              <span style={{ color: c.change.includes('+') ? '#00e676' : '#ff3d00', textShadow: `0 0 10px ${c.change.includes('+') ? 'rgba(0,230,118,0.3)' : 'rgba(255,61,0,0.3)'}` }}>{c.change}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* --- THE THREE COINS (3D INTERACTIVE) --- */}
-      <section id="three-windows" style={{ padding: '140px 0', position: 'relative' }}>
-        <div style={{ position: 'absolute', top: '10%', left: '5%', opacity: 0.05, filter: 'blur(100px)', zIndex: 0 }}>
-          <div style={{ width: '400px', height: '400px', borderRadius: '50%', background: 'var(--neon-gold)' }} />
-        </div>
-        <h2 style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)', fontWeight: '800', marginBottom: '64px', textAlign: 'center', position: 'relative', zIndex: 1 }}>
-          The <span style={{ color: 'var(--neon-gold)' }}>Redline</span> Advantage
-        </h2>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '40px', padding: '0 40px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
-
-          {/* BTC CARD */}
-          <div className="coin-card-container" style={{ position: 'relative', height: '500px', cursor: 'pointer', overflow: 'hidden' }}>
-            <motion.div
-              initial="initial"
-              whileHover="hover"
-              style={{ position: 'relative', width: '100%', height: '100%' }}
-            >
-              <motion.div
-                variants={{ initial: { opacity: 1, scale: 1, rotateY: 0 }, hover: { opacity: 0, scale: 0.8, rotateY: 180 } }}
-                transition={{ duration: 0.4 }}
-                style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
-              >
-                <motion.img
-                  src="/assets/coin_btc.png"
-                  alt="BTC 3D"
-                  style={{ width: '85%', height: 'auto', filter: 'drop-shadow(0 20px 50px rgba(0,0,0,0.6))' }}
-                  animate={{ y: [0, -20, 0] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                />
-              </motion.div>
-
-              <motion.div
-                variants={{ initial: { opacity: 0, scale: 0.8, rotateY: -180 }, hover: { opacity: 1, scale: 1, rotateY: 0 } }}
-                transition={{ duration: 0.4 }}
-                className="glass-panel"
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  zIndex: 1,
-                  borderRadius: '32px',
-                  padding: '40px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'flex-end',
-                  background: 'rgba(20, 20, 20, 0.8)',
-                  border: '1px solid var(--neon-gold)',
-                  overflow: 'hidden'
-                }}
-              >
-                <Radar className="window-bg-icon" />
-                <Target size={44} color="var(--neon-gold)" style={{ marginBottom: '20px' }} />
-                <h3 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', marginBottom: '12px', fontWeight: '800' }}>Neural Scanner</h3>
-                <p style={{ color: 'var(--text-dim)', fontSize: 'clamp(0.9rem, 1.5vw, 1.1rem)', lineHeight: '1.6' }}>
-                  Proprietary MQS algorithms scan the global order book. We detect institutional footprints before they trigger momentum.
-                </p>
-              </motion.div>
-            </motion.div>
-          </div>
-
-          {/* ETH CARD */}
-          <div className="coin-card-container" style={{ position: 'relative', height: '500px', cursor: 'pointer', overflow: 'hidden' }}>
-            <motion.div initial="initial" whileHover="hover" style={{ position: 'relative', width: '100%', height: '100%' }}>
-              <motion.div
-                variants={{ initial: { opacity: 1, scale: 1, rotateY: 0 }, hover: { opacity: 0, scale: 0.8, rotateY: 180 } }}
-                transition={{ duration: 0.4 }}
-                style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
-              >
-                <motion.img
-                  src="/assets/coin_eth.png"
-                  alt="ETH 3D"
-                  style={{ width: '85%', height: 'auto', filter: 'drop-shadow(0 20px 50px rgba(0,0,0,0.6))' }}
-                  animate={{ y: [0, -25, 0] }}
-                  transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                />
-              </motion.div>
-
-              <motion.div
-                variants={{ initial: { opacity: 0, scale: 0.8, rotateY: -180 }, hover: { opacity: 1, scale: 1, rotateY: 0 } }}
-                transition={{ duration: 0.4 }}
-                className="glass-panel"
-                style={{ position: 'absolute', inset: 0, zIndex: 1, borderRadius: '32px', padding: '40px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'rgba(20, 20, 20, 0.8)', border: '1px solid #7c4dff', overflow: 'hidden' }}
-              >
-                <Cpu className="window-bg-icon" />
-                <Activity size={44} color="#7c4dff" style={{ marginBottom: '20px' }} />
-                <h3 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', marginBottom: '12px', fontWeight: '800', color: '#7c4dff' }}>AI Execution</h3>
-                <p style={{ color: 'var(--text-dim)', fontSize: 'clamp(0.9rem, 1.5vw, 1.1rem)', lineHeight: '1.6' }}>
-                  Dynamic risk management powered by Monte Carlo logic. We only execute when the probability density favors your capital.
-                </p>
-              </motion.div>
-            </motion.div>
-          </div>
-
-          {/* SOL CARD */}
-          <div className="coin-card-container" style={{ position: 'relative', height: '500px', cursor: 'pointer', overflow: 'hidden' }}>
-            <motion.div initial="initial" whileHover="hover" style={{ position: 'relative', width: '100%', height: '100%' }}>
-              <motion.div
-                variants={{ initial: { opacity: 1, scale: 1, rotateY: 0 }, hover: { opacity: 0, scale: 0.8, rotateY: 180 } }}
-                transition={{ duration: 0.4 }}
-                style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
-              >
-                <motion.img
-                  src="/assets/coin_sol.png"
-                  alt="SOL 3D"
-                  style={{ width: '85%', height: 'auto', filter: 'drop-shadow(0 20px 50px rgba(0,0,0,0.6))' }}
-                  animate={{ y: [0, -18, 0] }}
-                  transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-                />
-              </motion.div>
-
-              <motion.div
-                variants={{ initial: { opacity: 0, scale: 0.8, rotateY: -180 }, hover: { opacity: 1, scale: 1, rotateY: 0 } }}
-                transition={{ duration: 0.4 }}
-                className="glass-panel"
-                style={{ position: 'absolute', inset: 0, zIndex: 1, borderRadius: '32px', padding: '40px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'rgba(20, 20, 20, 0.8)', border: '1px solid #00e676', overflow: 'hidden' }}
-              >
-                <ShieldCheck className="window-bg-icon" />
-                <Zap size={44} color="#00e676" style={{ marginBottom: '20px' }} />
-                <h3 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', marginBottom: '12px', fontWeight: '800', color: '#00e676' }}>Competitive Edge</h3>
-                <p style={{ color: 'var(--text-dim)', fontSize: 'clamp(0.9rem, 1.5vw, 1.1rem)', lineHeight: '1.6' }}>
-                  While others follow lag indicators, Redline predicts regime shifts. Non-custodial, lightning-fast, and battle-tested.
-                </p>
-              </motion.div>
-            </motion.div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* --- AI VIZ --- */}
-      <section style={{ padding: '120px 40px', maxWidth: '1300px', margin: '0 auto', width: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '60px' }}>
-          <div>
-            <h2 style={{ fontSize: '40px', fontWeight: '800', marginBottom: '16px' }}>Market Brain</h2>
-            <p style={{ color: 'var(--text-dim)', fontSize: '18px' }}>Watch the AI process raw volatility into actionable intelligence.</p>
-          </div>
-          <div className="glass-panel" style={{ padding: '16px 32px', fontSize: '14px', fontWeight: '800', color: 'var(--neon-gold)', border: '1px solid rgba(226,183,20,0.2)' }}>
-            ACCURACY INDEX: 92.8%
-          </div>
-        </div>
-        <div className="glass-panel" style={{ padding: '40px', height: '500px', borderRadius: '24px', position: 'relative', overflow: 'hidden', background: 'rgba(0,0,0,0.3)' }}>
-          <div className="laser-scan" />
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={aiLogicData}>
-              <defs>
-                <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--neon-gold)" stopOpacity={0.4} /><stop offset="95%" stopColor="var(--neon-gold)" stopOpacity={0} /></linearGradient>
-                <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--neon-blue)" stopOpacity={0.3} /><stop offset="95%" stopColor="var(--neon-blue)" stopOpacity={0} /></linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-              <XAxis dataKey="time" stroke="var(--text-dim)" fontSize={12} axisLine={false} tickLine={false} />
-              <YAxis stroke="var(--text-dim)" fontSize={12} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ background: 'rgba(10,10,12,0.95)', border: '1px solid var(--glass-border)', borderRadius: '12px', color: '#fff' }} itemStyle={{ color: '#fff' }} />
-              <Area type="monotone" dataKey="filtered" stroke="var(--neon-gold)" fill="url(#g1)" strokeWidth={3} activeDot={{ r: 6 }} />
-              <Area type="monotone" dataKey="confidence" stroke="var(--neon-blue)" fill="url(#g2)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
-
-      {/* --- FOOTER --- */}
-      <footer style={{ padding: '100px 40px', textAlign: 'center', borderTop: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)' }}>
-        <img src="/assets/logo_transparent.jpg" alt="Redline footer" style={{ height: '30px', opacity: 0.3, marginBottom: '32px' }} />
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '50px', marginBottom: '40px', color: 'var(--text-dim)', fontSize: '13px', fontWeight: '600' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Globe size={16} /> Edge Nodes: 24</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Lock size={16} /> AES-256 Vault</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={16} /> Uptime: 99.99%</span>
-        </div>
-        <div style={{ color: 'var(--text-dim)', fontSize: '11px', opacity: 0.5, letterSpacing: '1px' }}>
-          &copy; 2026 REDLINE QUANTUM STRATEGIES. RESERVED BY THE COUNCIL.
-        </div>
-      </footer>
-
-      {/* --- AUTH SLIDE PANEL --- */}
-      {showAuth && (
-        <div
-          style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', zIndex: 90 }}
-          onClick={() => setShowAuth(false)}
-        />
-      )}
-
-      <div className="glass-panel fade-in" style={{ position: 'fixed', right: showAuth ? '0' : '-100%', top: 0, width: '100%', maxWidth: '520px', height: '100vh', zIndex: 100, padding: '60px 40px', display: 'flex', flexDirection: 'column', transition: 'right 0.6s cubic-bezier(0.16, 1, 0.3, 1)', borderLeft: '1px solid rgba(255,255,255,0.1)', boxShadow: '-40px 0 80px rgba(0,0,0,0.9)', background: 'rgba(5, 5, 5, 0.85)', backdropFilter: 'blur(40px)', overflowY: 'auto' }} ref={sidebarRef}>
-        <button style={{ position: 'absolute', right: '32px', top: '32px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '28px' }} onClick={() => setShowAuth(false)}>&times;</button>
-
-        <div style={{ display: 'flex', marginBottom: '56px', gap: '40px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ padding: '16px 0', fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: authTab === 'login' ? 'var(--neon-gold)' : 'var(--text-dim)', borderBottom: `2px solid ${authTab === 'login' ? 'var(--neon-gold)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => { setAuthTab('login'); if (sidebarRef.current) sidebarRef.current.scrollTop = 0; }}>Terminal</div>
-          <div style={{ padding: '16px 0', fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: authTab === 'request' ? 'var(--neon-gold)' : 'var(--text-dim)', borderBottom: `2px solid ${authTab === 'request' ? 'var(--neon-gold)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => { setAuthTab('request'); if (sidebarRef.current) sidebarRef.current.scrollTop = 0; }}>Inquiry</div>
-        </div>
-
-        {authTab === 'login' ? (
-          <form onSubmit={handleLogin} className="fade-in">
-            <h2 style={{ fontSize: '36px', fontWeight: '900', marginBottom: '12px' }}>Welcome, <br /> Operator.</h2>
-            <p style={{ color: 'var(--text-dim)', marginBottom: '40px', fontSize: '15px' }}>Enter your encrypted credentials to link.</p>
-
-            {authError && <div style={{ background: 'rgba(255, 61, 0, 0.1)', color: '#ff3d00', padding: '16px', borderRadius: '12px', marginBottom: '24px', fontSize: '14px', border: '1px solid rgba(255, 61, 0, 0.2)' }}>{authError}</div>}
-
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: 'var(--text-dim)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '2px' }}>Identity Hash</label>
-              <input type="text" value={username} onChange={e => setUsername(e.target.value)} style={{ width: '100%', padding: '18px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: '14px', color: '#fff', outline: 'none', fontSize: '16px' }} placeholder="User identifier..." required />
-            </div>
-
-            <div style={{ marginBottom: '40px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: 'var(--text-dim)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '2px' }}>Handshake Key</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '18px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: '14px', color: '#fff', outline: 'none', fontSize: '16px' }} placeholder="••••••••" required />
-            </div>
-
-            <button type="submit" disabled={loading} className="glow-btn" style={{ width: '100%', padding: '20px', fontSize: '16px', borderRadius: '14px' }}>
-              {loading ? <Loader2 className="animate-spin" size={24} /> : 'Initialize Uplink'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleRequest} className="fade-in">
-            {reqStatus.sent ? (
-              <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                <CheckCircle size={80} color="var(--neon-gold)" style={{ marginBottom: '32px' }} />
-                <h2 style={{ fontSize: '32px', fontWeight: '900', marginBottom: '16px' }}>Request Dispatched</h2>
-                <p style={{ color: 'var(--text-dim)', fontSize: '16px', lineHeight: '1.6' }}>We are vetting your credentials. Expect a secure response within 24 hours.</p>
-                <button onClick={() => setAuthTab('login')} className="glass-panel" style={{ padding: '16px 36px', borderRadius: '12px', color: '#fff', marginTop: '40px', cursor: 'pointer', fontWeight: '700' }}>Back to Terminal</button>
+                {/* Login Box */}
+                <SpotlightCard className="w-full max-w-md mx-auto p-10 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+                  <div className="mb-8">
+                    <h2 className="text-2xl font-bold text-white">Operator Access</h2>
+                    <p className="text-gray-500 text-sm mt-1">Authorized personnel only.</p>
+                  </div>
+                  <form onSubmit={handleLogin} className="space-y-5">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Identity Hash</label>
+                      <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-purple-500/50 transition-all font-mono text-sm" placeholder="USR-ID..." />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Security Key</label>
+                      <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-purple-500/50 transition-all font-mono text-sm" placeholder="••••••••••••" />
+                    </div>
+                    {error && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-lg font-mono">! {error}</div>}
+                    <button type="submit" disabled={loading} className="w-full bg-white text-black font-bold p-4 rounded-xl hover:bg-gray-200 transition-all flex items-center justify-center gap-2 mt-6">
+                      {loading ? <Loader2 className="animate-spin" /> : <>INITIALIZE LINK <ArrowRight size={18} /></>}
+                    </button>
+                  </form>
+                </SpotlightCard>
               </div>
-            ) : (
-              <>
-                <h2 style={{ fontSize: '36px', fontWeight: '900', marginBottom: '12px' }}>Access Protocol</h2>
-                <p style={{ color: 'var(--text-dim)', marginBottom: '40px', fontSize: '14px' }}>Join the elite. Tell us who you are.</p>
 
-                {reqStatus.error && <div style={{ background: 'rgba(255, 61, 0, 0.1)', color: '#ff3d00', padding: '16px', borderRadius: '12px', marginBottom: '24px', fontSize: '14px', border: '1px solid rgba(255, 61, 0, 0.2)' }}>{reqStatus.error}</div>}
+              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-gray-600 flex flex-col items-center gap-2">
+                <span className="text-[10px] uppercase tracking-widest">System Architecture</span>
+                <div className="w-[1px] h-8 bg-gradient-to-b from-gray-600 to-transparent"></div>
+              </div>
+            </div>
 
-                <input type="text" placeholder="Full Name / Org" required value={reqData.fullName} onChange={e => setReqData({ ...reqData, fullName: e.target.value })} style={{ width: '100%', padding: '18px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: '14px', color: '#fff', outline: 'none', marginBottom: '16px' }} />
-                <input type="email" placeholder="Email (Proton/Encrypted)" required value={reqData.email} onChange={e => setReqData({ ...reqData, email: e.target.value })} style={{ width: '100%', padding: '18px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: '14px', color: '#fff', outline: 'none', marginBottom: '16px' }} />
-                <input type="tel" placeholder="Telegram / Signal" required value={reqData.phone} onChange={e => setReqData({ ...reqData, phone: e.target.value })} style={{ width: '100%', padding: '18px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: '14px', color: '#fff', outline: 'none', marginBottom: '16px' }} />
-                <textarea placeholder="Trading track record / Portfolio size..." required value={reqData.about} onChange={e => setReqData({ ...reqData, about: e.target.value })} style={{ width: '100%', padding: '18px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: '14px', color: '#fff', outline: 'none', minHeight: '140px', fontFamily: 'inherit', marginBottom: '32px' }} />
+            {/* --- TICKER & SECTIONS (Charts, Timeline, Features) --- */}
+            <div className="w-full border-y border-white/[0.05] bg-black/50 backdrop-blur-md py-4 overflow-hidden relative z-20">
+              <div className="flex gap-12 animate-marquee whitespace-nowrap">
+                {[...tickers, ...tickers, ...tickers].map((ticker, i) => (
+                  <div key={i} className="flex items-center gap-2 text-gray-400 font-mono text-sm">
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>{ticker}
+                  </div>
+                ))}
+              </div>
+            </div>
 
-                <button type="submit" disabled={loading} className="glow-btn" style={{ width: '100%', padding: '20px', fontSize: '16px', borderRadius: '14px' }}>
-                  {loading ? <Loader2 className="animate-spin" size={24} /> : 'Send Application'}
-                </button>
-              </>
-            )}
-          </form>
+            <section className="py-32 relative z-10">
+              <div className="max-w-7xl mx-auto px-6">
+                <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-12 flex justify-between items-end">
+                  <div><h2 className="text-4xl md:text-5xl font-bold mb-4">Market Outperformance</h2><p className="text-gray-400 max-w-xl">Cumulative PnL against market benchmark.</p></div>
+                  <div className="text-right hidden md:block"><div className="text-5xl font-mono font-bold text-yellow-400">+342.8%</div><div className="text-sm text-gray-500 uppercase tracking-widest mt-2 animate-pulse">LIVE TRACKING</div></div>
+                </motion.div>
+                <SpotlightCard className="w-full h-[500px] p-4 md:p-8"><LiveCandleChart /></SpotlightCard>
+              </div>
+            </section>
+
+            <section className="py-32 relative z-10 bg-[#080808]">
+              <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20">
+                <div className="space-y-12">
+                  <h2 className="text-4xl font-bold">Architecture & Logic</h2>
+                  <div className="space-y-0 relative border-l border-white/10 ml-4">
+                    {[{ title: "Data Ingestion", desc: "Websockets connect to 12 major exchanges.", icon: <Database size={16} /> }, { title: "Regime Classification", desc: "LSTM networks classify market state.", icon: <Cpu size={16} /> }, { title: "Execution", desc: "Orders routed via private nodes.", icon: <Zap size={16} /> }].map((step, i) => (
+                      <div key={i} className="pl-12 pb-12 relative group">
+                        <div className="absolute left-[-25px] top-0 w-12 h-12 bg-[#080808] border border-white/20 rounded-full flex items-center justify-center text-gray-400 group-hover:text-white group-hover:border-purple-500 transition-all z-10">{step.icon}</div>
+                        <h3 className="text-xl font-bold text-white mb-2">{step.title}</h3>
+                        <p className="text-gray-500 text-sm leading-relaxed">{step.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="relative"><div className="sticky top-32"><div className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 font-mono text-xs text-gray-400 shadow-2xl"><div className="space-y-2 opacity-80"><p><span className="text-purple-400">root@redline:~$</span> ./init_core.sh</p><p className="text-green-400">[OK] Connected</p><p className="text-yellow-400">DETECTED: Volatility Spike</p><p>EXECUTING...</p><span className="animate-pulse">_</span></div></div></div></div>
+              </div>
+            </section>
+
+            <section className="py-32 relative z-10">
+              <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+                {[{ icon: <Cpu className="text-purple-400" size={32} />, title: "Regime Detection", desc: "Identifies market phases automatically." }, { icon: <Server className="text-blue-400" size={32} />, title: "Zero Latency", desc: "Execution speed under 25ms globally." }, { icon: <Activity className="text-green-400" size={32} />, title: "Risk Guard", desc: "Monte Carlo simulations run continuously." }].map((feature, i) => (
+                  <SpotlightCard key={i} className="p-8"><div className="mb-6 p-4 bg-white/5 rounded-2xl w-fit">{feature.icon}</div><h3 className="text-xl font-bold mb-3">{feature.title}</h3><p className="text-gray-400 leading-relaxed text-sm">{feature.desc}</p></SpotlightCard>
+                ))}
+              </div>
+            </section>
+
+            {/* --- CTA FOOTER --- */}
+            <section className="py-24 bg-gradient-to-b from-transparent to-[#080808]">
+              <div className="max-w-7xl mx-auto px-6 text-center">
+                <SpotlightCard className="max-w-2xl mx-auto p-12">
+                  <h2 className="text-3xl font-bold mb-4 relative z-10">Ready to deploy?</h2>
+                  <p className="text-gray-400 mb-8 relative z-10">Access is restricted to verified operators only.</p>
+                  <button onClick={() => setView('application')} className="bg-white text-black font-bold px-8 py-4 rounded-full hover:scale-105 transition-all relative z-10 shadow-[0_0_20px_rgba(255,255,255,0.3)]">Request Access</button>
+                </SpotlightCard>
+              </div>
+            </section>
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
+
+      {/* ================= APPLICATION FORM OVERLAY ================= */}
+      <AnimatePresence>
+        {view === 'application' && (
+          <motion.div
+            initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+            animate={{ opacity: 1, backdropFilter: "blur(20px)" }}
+            exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 overflow-y-auto" // Added overflow
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="w-full max-w-2xl bg-[#0F0F11] border border-white/10 rounded-3xl p-8 md:p-12 shadow-2xl relative my-10" // Margin for scroll
+            >
+              <button onClick={() => setView('landing')} className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors"><X size={24} /></button>
+
+              {appStatus === 'success' ? (
+                <div className="flex flex-col items-center text-center py-10">
+                  <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mb-6"><CheckCircle className="text-green-500" size={40} /></div>
+                  <h2 className="text-3xl font-bold mb-2">Application Received</h2>
+                  <p className="text-gray-400 max-w-md">Your encrypted profile has been sent to our vetting team. Expect a response within 48h.</p>
+                  <button onClick={() => setView('landing')} className="mt-8 text-sm font-bold border-b border-white pb-1">Return to Terminal</button>
+                </div>
+              ) : (
+                <form onSubmit={handleAppSubmit} className="space-y-6 h-full max-h-[80vh] overflow-y-auto custom-scrollbar px-2">
+                  <div><h2 className="text-3xl font-bold mb-2">Vetting Process</h2><p className="text-gray-500">Please provide detailed information for background check.</p></div>
+
+                  {/* Name Fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2"><label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><User size={12} /> First Name</label><input required type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-purple-500 outline-none transition-colors" placeholder="John" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} /></div>
+                    <div className="space-y-2"><label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><User size={12} /> Last Name</label><input required type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-purple-500 outline-none transition-colors" placeholder="Doe" value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} /></div>
+                  </div>
+
+                  {/* Contact Fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2"><label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><Mail size={12} /> Email</label><input required type="email" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-purple-500 outline-none transition-colors" placeholder="john@example.com" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} /></div>
+                    <div className="space-y-2"><label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><Phone size={12} /> Phone</label><input required type="tel" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-purple-500 outline-none transition-colors" placeholder="+1 234 567 890" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} /></div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2"><label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><Globe size={12} /> Country</label><input required type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-purple-500 outline-none transition-colors" placeholder="Switzerland" value={formData.country} onChange={e => setFormData({ ...formData, country: e.target.value })} /></div>
+                    <div className="space-y-2"><label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><Briefcase size={12} /> Crypto Experience</label><select className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-purple-500 outline-none transition-colors" value={formData.experience} onChange={e => setFormData({ ...formData, experience: e.target.value })}><option value="" className="bg-black text-gray-500">Select duration...</option><option value="1-2" className="bg-black">1-2 Years</option><option value="3-5" className="bg-black">3-5 Years</option><option value="5+" className="bg-black">5+ Years (Institutional)</option></select></div>
+                  </div>
+
+                  <div className="space-y-2"><label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><Activity size={12} /> Why do you want access?</label><textarea required className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-purple-500 outline-none transition-colors min-h-[80px]" placeholder="Explain your trading goals..." value={formData.reason} onChange={e => setFormData({ ...formData, reason: e.target.value })} /></div>
+                  <div className="space-y-2"><label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><FileText size={12} /> Tell us about yourself</label><textarea required className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-purple-500 outline-none transition-colors min-h-[100px]" placeholder="Your background, expertise, or bio..." value={formData.bio} onChange={e => setFormData({ ...formData, bio: e.target.value })} /></div>
+
+                  {/* LIABILITY WAIVER */}
+                  <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl flex items-start gap-4">
+                    <input
+                      type="checkbox"
+                      id="liability"
+                      required
+                      className="mt-1 w-5 h-5 rounded border-gray-600 bg-black/40 text-red-500 focus:ring-red-500"
+                      checked={formData.liabilityAccepted}
+                      onChange={e => setFormData({ ...formData, liabilityAccepted: e.target.checked })}
+                    />
+                    <label htmlFor="liability" className="text-xs text-gray-400 leading-relaxed cursor-pointer">
+                      <span className="font-bold text-red-400 block mb-1 flex items-center gap-2"><AlertTriangle size={14} /> RISK DISCLAIMER</span>
+                      By checking this box, I acknowledge that Redline Systems accepts NO responsibility for financial losses incurred through the use of this software. Cryptocurrency trading involves high risk.
+                    </label>
+                  </div>
+
+                  <button type="submit" disabled={appStatus === 'sending'} className="w-full bg-white text-black font-bold p-4 rounded-xl hover:bg-gray-200 transition-all flex items-center justify-center gap-2">{appStatus === 'sending' ? <Loader2 className="animate-spin" /> : "Submit Application"}</button>
+                </form>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
