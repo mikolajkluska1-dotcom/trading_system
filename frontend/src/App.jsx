@@ -11,6 +11,8 @@ import Wallet from './views/Wallet';
 import Training from './views/training';
 import AdminPanel from './views/AdminPanel';
 import AISettings from './views/AISettings';
+import Notifications from './views/Notifications';
+import UserSettings from './views/UserSettings';
 import TradingHub from './views/TradingHub'; // New consolidated view
 
 import OpsLayout from './layouts/OpsLayout';
@@ -49,6 +51,8 @@ const AppContent = () => {
       {activeTab === 'training' && <Training />}
       {activeTab === 'admin' && <AdminPanel />}
       {activeTab === 'ai-settings' && <AISettings />}
+      {activeTab === 'notifications' && <Notifications />}
+      {activeTab === 'user-settings' && <UserSettings />}
     </OpsLayout>
   );
 };

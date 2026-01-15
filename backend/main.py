@@ -330,6 +330,24 @@ def update_ai_settings(req: AISettingsRequest):
     AI_CONFIG = AIConfigManager.update_config(updates)
     return {"status": "UPDATED", "config": AI_CONFIG}
 
+
+# --- WEBHOOKS: INTERNAL (Autonomous Node) ---
+class InternalWebhookRequest(BaseModel):
+    type: str  # e.g. "SCAN_COMPLETE", "SYSTEM_EVENT"
+    payload: dict  # The actual data
+
+@app.post("/api/webhook/internal")
+async def internal_webhook(req: InternalWebhookRequest):
+    """
+    Internal endpoint for Autonomous Node to push updates to Frontend via WebSockets.
+    """
+    await manager.broadcast({
+        "type": req.type,
+        "payload": req.payload,
+        "timestamp": datetime.now().isoformat()
+    })
+    return {"status": "BROADCASTED"}
+
 # --- WEBHOOKS: n8n / EXTERNAL ---
 @app.post("/api/webhooks/external_data")
 def external_data_webhook(req: N8nWebhookRequest):

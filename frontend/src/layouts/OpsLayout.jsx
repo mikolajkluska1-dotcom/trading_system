@@ -1,16 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { LayoutDashboard, Cpu, Activity, Wallet, Settings, LogOut, ShieldCheck, Bell } from 'lucide-react';
+import { LayoutDashboard, Cpu, Activity, Wallet, Settings, LogOut, ShieldCheck, Bell, ShieldAlert } from 'lucide-react';
+import NotificationDrawer from '../components/NotificationDrawer';
 
 const OpsLayout = ({ children, activeTab, setActiveTab }) => {
   const { logout, user } = useAuth();
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  // LIFETIME STATE for Notifications (Lifted up for Red Dot logic)
+  const [notifications, setNotifications] = useState([
+    { id: 1, message: "Whale Alert: 1,500 BTC moved to Binance", time: "2m ago", read: false },
+    { id: 2, message: "System: Evolution Cycle Completed", time: "1h ago", read: false },
+    { id: 3, message: "Risk: Exposure High on SOL", time: "3h ago", read: true },
+    { id: 4, message: "Security: New Login from IP 192.168.1.5", time: "5h ago", read: true },
+  ]);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const handleMarkAsRead = (id) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
 
   const menuItems = [
     { id: 'dashboard', icon: <LayoutDashboard size={18} />, label: 'Overview' },
     { id: 'trading-hub', icon: <Cpu size={18} />, label: 'Trading Hub' },
     { id: 'autopilot', icon: <Activity size={18} />, label: 'AI Trader' },
     { id: 'wallet', icon: <Wallet size={18} />, label: 'Capital' },
-    { id: 'ai-settings', icon: <Settings size={18} />, label: 'Settings' },
+    { id: 'ai-settings', icon: <Settings size={18} />, label: 'AI Tuning' },
   ];
 
   return (
@@ -24,13 +40,13 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
       <nav className="fixed top-0 left-0 w-full h-20 z-50 px-6 flex items-center justify-between border-b border-white/[0.08] bg-[#050505]/80 backdrop-blur-xl">
 
         {/* Logo Area */}
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-white/[0.05] rounded-lg border border-white/10">
-            <ShieldCheck className="text-yellow-400" size={24} />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-bold tracking-widest text-lg leading-none text-white">REDLINE</span>
-            <span className="text-[10px] text-gray-500 uppercase tracking-[0.3em] mt-0.5">Quantum Core</span>
+        <div className="flex items-center gap-2 -ml-1">
+          {/* NEW LOGO IMAGE */}
+          <img src="/assets/redline_logo.png" alt="RedLine Logo" className="h-8 w-auto object-contain drop-shadow-[0_0_5px_rgba(220,38,38,0.5)]" />
+
+          {/* Text Name (hidden on small screens) */}
+          <div className="text-xl font-black tracking-tighter text-white hidden md:block">
+            RED<span className="text-purple-500">LINE</span>
           </div>
         </div>
 
@@ -55,21 +71,50 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
 
         {/* Right Area (User & Actions) */}
         <div className="flex items-center gap-5">
-          <button className="relative p-2 text-gray-400 hover:text-white transition-colors">
+          <button
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="relative p-2 text-gray-400 hover:text-white transition-colors"
+          >
             <Bell size={20} />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-black animate-pulse"></span>
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-black animate-pulse"></span>
+            )}
           </button>
 
           <div className="h-8 w-[1px] bg-white/10"></div>
 
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
-              <div className="text-xs font-bold text-white">{user?.username || 'OPERATOR'}</div>
-              <div className="text-[10px] text-green-400 font-mono tracking-wider">ENCRYPTED</div>
+          <div className="flex items-center gap-4">
+            {/* Admin Button (Conditional) */}
+            {['ROOT', 'ADMIN'].includes(user?.role) && (
+              <button
+                onClick={() => setActiveTab('admin')}
+                className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 text-xs font-bold uppercase transition-colors"
+              >
+                <ShieldAlert size={14} />
+                Admin
+              </button>
+            )}
+
+            {/* Clickable User Profile "Card" */}
+            <div
+              onClick={() => setActiveTab('user-settings')}
+              className="flex items-center gap-3 cursor-pointer p-1.5 pr-4 rounded-full border border-transparent hover:bg-white/5 hover:border-white/5 transition-all group"
+            >
+              {/* Avatar Display */}
+              <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10 group-hover:border-purple-500/50 transition-colors">
+                <img src="/assets/ai_avatar.png" alt="Avatar" className="w-full h-full object-cover opacity-80 group-hover:opacity-100" />
+              </div>
+
+              <div className="hidden sm:block">
+                <div className="text-sm font-bold text-white leading-tight group-hover:text-purple-400 transition-colors">{user?.username || 'OPERATOR'}</div>
+                <div className="text-[10px] text-gray-500 font-mono">View Profile</div>
+              </div>
             </div>
+
             <button
               onClick={logout}
-              className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-all text-gray-400"
+              className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-all text-gray-400 ml-2"
+              title="Logout"
             >
               <LogOut size={18} />
             </button>
@@ -77,10 +122,18 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
         </div>
       </nav>
 
-      {/* MAIN CONTENT AREA */}
+      {/* Main Content */}
       <main className="pt-28 pb-10 px-6 relative z-10 max-w-[1600px] mx-auto min-h-screen">
         {children}
       </main>
+
+      {/* Slide-over Drawer - Passing properties */}
+      <NotificationDrawer
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        notifications={notifications}
+        onMarkRead={handleMarkAsRead}
+      />
     </div>
   );
 };
