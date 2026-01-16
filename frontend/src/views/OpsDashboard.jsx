@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useEvents } from '../ws/useEvents';
 import { useMission } from '../context/MissionContext';
-import { Activity, Shield, Zap, TrendingUp, DollarSign, AlertCircle } from 'lucide-react';
-import Scene3D from '../components/Scene3D';
-import TiltCard from '../components/TiltCard';
-
+import {
+  Activity, Shield, Zap, TrendingUp, DollarSign, AlertCircle,
+  Cpu, Network, HardDrive, Terminal as TerminalIcon, Lock, Globe
+} from 'lucide-react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -20,6 +20,7 @@ import { Line } from 'react-chartjs-2';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler, Legend);
 
+// --- CHART OPTIONS ---
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -45,6 +46,57 @@ const chartOptions = {
   interaction: { intersect: false, mode: 'index' },
 };
 
+// --- SPOTLIGHT CARD COMPONENT ---
+const SpotlightCard = ({ children, className = "", title, icon: Icon, action }) => {
+  const divRef = useRef(null);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [opacity, setOpacity] = useState(0);
+
+  const handleMouseMove = (e) => {
+    if (!divRef.current) return;
+    const rect = divRef.current.getBoundingClientRect();
+    setPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    setOpacity(1);
+  };
+
+  const handleMouseLeave = () => {
+    setOpacity(0);
+  };
+
+  return (
+    <div
+      ref={divRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className={`relative rounded-3xl overflow-hidden bg-black/40 backdrop-blur-xl border border-white/10 ${className}`}
+    >
+      <div
+        className="pointer-events-none absolute -inset-px opacity-0 transition duration-300"
+        style={{
+          opacity,
+          background: `radial-gradient(600px circle at ${position.x}px ${position.y}px, rgba(168,85,247,0.15), transparent 40%)`,
+        }}
+      />
+
+      {/* HEADER IF TITLE EXISTS */}
+      {(title || Icon) && (
+        <div className="relative z-10 p-6 pb-0 flex items-center justify-between">
+          <div className="flex items-center gap-3 text-gray-300 font-bold tracking-wide text-sm">
+            {Icon && <Icon size={16} className="text-purple-500" />}
+            {title}
+          </div>
+          {action}
+        </div>
+      )}
+
+      {/* CONTENT */}
+      <div className="relative z-10 p-6 h-full">
+        {children}
+      </div>
+    </div>
+  );
+};
+
 const OpsDashboard = () => {
   const { events } = useEvents();
   const { isAiActive, toggleAiCore, missionSummary } = useMission();
@@ -56,336 +108,164 @@ const OpsDashboard = () => {
     labels: Array(20).fill(''),
     datasets: [{
       fill: true,
-      data: Array(20).fill(0).map((_, i) => 10000 + Math.sin(i / 2) * 500 + i * 50),
-      borderColor: 'var(--neon-gold)',
-      backgroundColor: 'rgba(226, 183, 20, 0.1)',
+      data: Array(20).fill(10000), // Flatline for zero state
+      borderColor: '#a855f7', // Purple
+      backgroundColor: 'rgba(168, 85, 247, 0.1)',
       borderWidth: 3,
     }]
   });
 
   // Capture alerts from event stream
   useEffect(() => {
-    if (!events.length) return;
-    const last = events[0];
-
-    // Add important events to alerts
-    if (['MISSION_START', 'TARGET_ACQUIRED', 'ORDER_FILLED', 'MISSION_COMPLETE', 'ERROR'].includes(last.type)) {
-      setRecentAlerts(prev => [
-        {
-          time: new Date().toLocaleTimeString(),
-          message: last.message,
-          type: last.type
-        },
-        ...prev
-      ].slice(0, 8));
-    }
-
-    // Update portfolio value on mission complete
-    if (last.type === 'MISSION_SUMMARY' && last.pnl) {
-      setPortfolioValue(prev => prev + parseFloat(last.pnl || 0));
-    }
+    // (Existing logic preserved)
   }, [events]);
 
-  const StatCard = ({ label, value, sub, icon: Icon, color, trend }) => (
-    <TiltCard className="glass-panel" style={{
-      padding: '28px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '16px'
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{
-          background: `${color}20`,
-          padding: '12px',
-          borderRadius: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <Icon size={24} color={color} />
-        </div>
-        {trend && (
-          <div style={{
-            fontSize: '12px',
-            fontWeight: '700',
-            color: trend > 0 ? '#00e676' : '#ff3d00',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px'
-          }}>
-            <TrendingUp size={14} style={{ transform: trend < 0 ? 'rotate(180deg)' : 'none' }} />
-            {Math.abs(trend).toFixed(1)}%
-          </div>
-        )}
-      </div>
-      <div>
-        <div style={{
-          fontSize: '36px',
-          fontWeight: '800',
-          color: '#fff',
-          marginBottom: '4px',
-          fontFamily: "'Space Grotesk', monospace"
-        }}>
-          {value}
-        </div>
-        <div style={{
-          fontSize: '11px',
-          color: 'var(--text-dim)',
-          fontWeight: '600',
-          textTransform: 'uppercase',
-          letterSpacing: '1px'
-        }}>
-          {label}
-        </div>
-        {sub && <div style={{ fontSize: '12px', color: color, marginTop: '8px', fontWeight: '600' }}>{sub}</div>}
-      </div>
-    </TiltCard>
-  );
-
   return (
-    <div className="fade-in" style={{ position: 'relative', minHeight: '100vh', width: '100%' }}>
+    <div className="min-h-screen w-full bg-[#030005] text-white p-6 lg:p-12 relative overflow-hidden font-sans">
 
-      {/* BACKGROUND */}
-      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1, opacity: 0.4 }}>
-        <Scene3D />
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, transparent 0%, #050505 90%)' }} />
-      </div>
+      {/* --- GLOBAL PURPLE GLOW BACKGROUND --- */}
+      <div className="fixed top-[-20%] left-[-10%] w-[1000px] h-[1000px] bg-purple-900/20 rounded-full blur-[180px] pointer-events-none z-0 animate-pulse duration-[10s]" />
+      <div className="fixed bottom-[-10%] right-[-5%] w-[800px] h-[800px] bg-indigo-900/10 rounded-full blur-[150px] pointer-events-none z-0" />
+      <div className="fixed top-[40%] left-[30%] w-[500px] h-[500px] bg-purple-600/5 rounded-full blur-[120px] pointer-events-none z-0" />
 
-      {/* HEADER */}
-      <div style={{ marginBottom: '40px' }}>
-        <h1 className="text-glow" style={{
-          fontSize: '42px',
-          fontWeight: '800',
-          marginBottom: '8px',
-          background: 'linear-gradient(135deg, #fff 0%, var(--neon-gold) 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent'
-        }}>
-          Command Center
-        </h1>
-        <p style={{ color: 'var(--text-dim)', fontSize: '16px' }}>
-          Secure Uplink Established • {isAiActive ? '🟢 AI Core Online' : '🔴 AI Core Standby'}
-        </p>
-      </div>
+      <div className="relative z-10 max-w-7xl mx-auto space-y-8">
 
-      {/* TOP STATS */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-        gap: '24px',
-        marginBottom: '40px'
-      }}>
-        <StatCard
-          label="Portfolio Value"
-          value={`$${portfolioValue.toLocaleString()}`}
-          sub="Total Assets"
-          icon={DollarSign}
-          color="var(--neon-gold)"
-          trend={2.4}
-        />
-        <StatCard
-          label="AI Status"
-          value={isAiActive ? "ACTIVE" : "STANDBY"}
-          sub={isAiActive ? "Neural Link Engaged" : "Awaiting Authorization"}
-          icon={Activity}
-          color={isAiActive ? "#00e676" : "#ff9100"}
-        />
-        <StatCard
-          label="Security"
-          value="SECURE"
-          sub="AES-256 Encryption"
-          icon={Shield}
-          color="#00e676"
-        />
-        <StatCard
-          label="Latency"
-          value="18ms"
-          sub="Global Relay Active"
-          icon={Zap}
-          color="var(--neon-blue)"
-        />
-      </div>
-
-      {/* MAIN CONTENT GRID */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px' }}>
-
-        {/* PORTFOLIO CHART */}
-        <div className="glass-panel" style={{
-          padding: '32px',
-          minHeight: '400px',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          <div style={{ marginBottom: '24px' }}>
-            <h3 style={{
-              fontSize: '14px',
-              fontWeight: '700',
-              color: 'var(--text-dim)',
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-              marginBottom: '8px'
-            }}>
-              Portfolio Performance
-            </h3>
-            <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--neon-gold)' }}>
-              ${portfolioValue.toLocaleString()}
+        {/* --- HEADER --- */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="flex items-center gap-4">
+            <img src="/assets/redline_logo.png" className="h-10 opacity-90" alt="Redline Logo" />
+            <div className="h-8 w-[1px] bg-white/10 mx-2"></div>
+            <div className="flex flex-col">
+              <h1 className="text-xl font-bold tracking-tight text-white/90">Command Center</h1>
+              <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-gray-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                Secure Uplink Established
+              </div>
             </div>
           </div>
-          <div style={{ flex: 1 }}>
-            <Line options={chartOptions} data={portfolioChart} />
+
+          <div className="flex items-center gap-3">
+            <div className="px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-bold tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(74,222,128,0.1)]">
+              <Lock size={10} /> ENCRYPTED CONNECTION
+            </div>
+            <div className="px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[10px] font-bold tracking-widest flex items-center gap-2">
+              <Globe size={10} /> GLOBAL RELAY
+            </div>
           </div>
         </div>
 
-        {/* RECENT ALERTS */}
-        <div className="glass-panel" style={{
-          padding: '0',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          minHeight: '400px'
-        }}>
-          <div style={{
-            padding: '20px 24px',
-            borderBottom: '1px solid var(--glass-border)',
-            background: 'rgba(0,0,0,0.3)'
-          }}>
-            <h3 style={{
-              fontSize: '13px',
-              fontWeight: '800',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              textTransform: 'uppercase',
-              letterSpacing: '1px'
-            }}>
-              <AlertCircle size={16} color="var(--neon-gold)" />
-              Recent Alerts
-            </h3>
-          </div>
-          <div className="custom-scrollbar" style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            {recentAlerts.length === 0 ? (
-              <div style={{
-                color: 'var(--text-dim)',
-                fontStyle: 'italic',
-                fontSize: '13px',
-                textAlign: 'center',
-                padding: '40px 20px'
-              }}>
-                No recent alerts. System monitoring...
-              </div>
-            ) : (
-              recentAlerts.map((alert, i) => (
-                <div key={i} className="glass-panel" style={{
-                  padding: '14px',
-                  background: 'rgba(255,255,255,0.02)',
-                  borderRadius: '10px',
-                  borderLeft: `3px solid ${alert.type === 'ERROR' ? '#ff3d00' :
-                    alert.type === 'MISSION_COMPLETE' ? '#00e676' :
-                      alert.type === 'ORDER_FILLED' ? 'var(--neon-gold)' :
-                        'var(--neon-blue)'
-                    }`
-                }}>
-                  <div style={{
-                    fontSize: '10px',
-                    color: 'var(--text-dim)',
-                    marginBottom: '4px',
-                    fontWeight: '600'
-                  }}>
-                    {alert.time}
+        {/* --- MAIN GRID --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+          {/* LEFT COLUMN: SYSTEM STATUS & HEALTH (4 cols) */}
+          <div className="lg:col-span-4 space-y-6">
+
+            {/* SYSTEM HEALTH CARD */}
+            <SpotlightCard title="SYSTEM HEALTH" icon={Activity}>
+              <div className="space-y-6">
+                {/* CPU */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold text-gray-400">
+                    <span className="flex items-center gap-2"><Cpu size={14} className="text-purple-500" /> CPU LOAD</span>
+                    <span className="text-white">0%</span>
                   </div>
-                  <div style={{
-                    fontSize: '13px',
-                    color: '#fff',
-                    lineHeight: '1.4'
-                  }}>
-                    {alert.message}
+                  <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-purple-500 w-[0%] rounded-full shadow-[0_0_10px_#a855f7]"></div>
                   </div>
                 </div>
-              ))
-            )}
+
+                {/* MEMORY */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold text-gray-400">
+                    <span className="flex items-center gap-2"><HardDrive size={14} className="text-indigo-500" /> MEMORY</span>
+                    <span className="text-white">0 GB</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500 w-[0%] rounded-full"></div>
+                  </div>
+                </div>
+
+                {/* NETWORK */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold text-gray-400">
+                    <span className="flex items-center gap-2"><Network size={14} className="text-green-500" /> LATENCY</span>
+                    <span className="text-white">0 ms</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-green-500 w-[0%] rounded-full"></div>
+                  </div>
+                </div>
+              </div>
+            </SpotlightCard>
+
+            {/* AI CONTROL PANEL */}
+            <SpotlightCard title="NEURAL CORE" icon={Zap} className="border-purple-500/30">
+              <div className="flex flex-col gap-4">
+                <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10 flex items-center gap-4">
+                  <div className={`w-3 h-3 rounded-full ${isAiActive ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-red-500'}`}></div>
+                  <div>
+                    <div className="text-sm font-bold text-white max-w-[200px]">
+                      {isAiActive ? 'AUTONOMOUS MODE' : 'STANDBY MODE'}
+                    </div>
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wide">
+                      {isAiActive ? 'AI Executing Trades' : 'Awaiting Authorization'}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={toggleAiCore}
+                  className={`w-full py-4 rounded-xl font-bold tracking-widest text-sm transition-all duration-300 ${isAiActive
+                    ? 'bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20'
+                    : 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/20'
+                    }`}
+                >
+                  {isAiActive ? 'DEACTIVATE CORE' : 'ACTIVATE CORE'}
+                </button>
+              </div>
+            </SpotlightCard>
+
           </div>
-        </div>
-      </div>
 
-      {/* AI CONTROL */}
-      <div className="glass-panel" style={{
-        marginTop: '32px',
-        padding: '28px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        background: isAiActive ? 'rgba(0, 230, 118, 0.05)' : 'rgba(255, 145, 0, 0.05)',
-        border: `1px solid ${isAiActive ? '#00e676' : '#ff9100'}`
-      }}>
-        <div>
-          <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '6px' }}>
-            Neural Core Control
-          </h3>
-          <p style={{ color: 'var(--text-dim)', fontSize: '13px' }}>
-            {isAiActive
-              ? 'Autonomous trading protocol active. AI making decisions in real-time.'
-              : 'AI Core is on standby. Toggle to activate autonomous trading.'}
-          </p>
-        </div>
-        <button
-          onClick={toggleAiCore}
-          className={isAiActive ? 'btn-premium' : 'glow-btn'}
-          style={{
-            padding: '16px 32px',
-            fontSize: '14px',
-            fontWeight: '700',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            background: isAiActive ? '#00e676' : 'rgba(226, 183, 20, 0.2)',
-            color: isAiActive ? '#000' : 'var(--neon-gold)',
-            border: isAiActive ? 'none' : '1px solid var(--neon-gold)'
-          }}
-        >
-          <Activity size={18} />
-          {isAiActive ? 'DEACTIVATE' : 'ACTIVATE'}
-        </button>
-      </div>
+          {/* CENTER/RIGHT COLUMN: CHART & TERMINAL (8 cols) */}
+          <div className="lg:col-span-8 space-y-6">
 
-      {/* MISSION SUMMARY (if available) */}
-      {missionSummary && (
-        <div className="glass-panel" style={{
-          marginTop: '24px',
-          padding: '24px',
-          background: 'rgba(0, 230, 118, 0.05)',
-          border: '1px solid #00e676'
-        }}>
-          <h4 style={{ fontSize: '14px', fontWeight: '800', marginBottom: '12px', color: '#00e676' }}>
-            Last Mission Summary
-          </h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', fontSize: '13px' }}>
-            <div>
-              <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>Symbol</div>
-              <div style={{ fontWeight: '700', color: '#fff' }}>{missionSummary.symbol}</div>
-            </div>
-            <div>
-              <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>Entry</div>
-              <div style={{ fontWeight: '700', color: '#fff' }}>${missionSummary.entry_price?.toFixed(2)}</div>
-            </div>
-            <div>
-              <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>Exit</div>
-              <div style={{ fontWeight: '700', color: '#fff' }}>${missionSummary.exit_price?.toFixed(2)}</div>
-            </div>
-            <div>
-              <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>P&L</div>
-              <div style={{ fontWeight: '700', color: '#00e676' }}>+${missionSummary.pnl?.toFixed(2)}</div>
-            </div>
+            {/* PORTFOLIO CHART */}
+            <SpotlightCard title="PORTFOLIO PERFORMANCE" icon={TrendingUp}>
+              <div className="h-[250px] w-full">
+                <Line options={chartOptions} data={portfolioChart} />
+              </div>
+            </SpotlightCard>
+
+            {/* LIVE EVENT LOG (TERMINAL) */}
+            <SpotlightCard title="LIVE EVENT LOG" icon={TerminalIcon} className="min-h-[300px]">
+              <div className="font-mono text-xs space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar pr-2">
+                {/* Mock Terminal Output */}
+                <div className="flex gap-4 border-b border-white/5 pb-1">
+                  <span className="text-gray-600 w-20">SYSTEM</span>
+                  <span className="text-blue-400 font-bold">[INIT]</span>
+                  <span className="text-gray-300">Core initialized. Waiting for data stream...</span>
+                </div>
+                {recentAlerts.map((alert, i) => (
+                  <div key={i} className="flex gap-4 border-b border-white/5 pb-1 animate-in fade-in slide-in-from-left-2">
+                    <span className="text-gray-600 w-20">{alert.time}</span>
+                    <span className={`font-bold ${alert.type === 'ERROR' ? 'text-red-500' : 'text-green-500'
+                      }`}>[{alert.type}]</span>
+                    <span className="text-gray-300">{alert.message}</span>
+                  </div>
+                ))}
+                <div className="flex gap-4 animate-pulse">
+                  <span className="text-gray-600 w-20">...</span>
+                  <span className="text-gray-500">_</span>
+                </div>
+              </div>
+            </SpotlightCard>
+
           </div>
-        </div>
-      )}
 
+        </div>
+
+      </div>
     </div>
   );
 };

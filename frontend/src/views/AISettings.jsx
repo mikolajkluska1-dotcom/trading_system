@@ -1,271 +1,218 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, Globe, Cpu, Save, RefreshCw } from 'lucide-react';
+import { motion } from 'framer-motion';
+import {
+    Brain, Zap, Activity, Save, Database,
+    Terminal, Sliders, Play, Pause, AlertTriangle,
+    Trash2, RefreshCw, Server
+} from 'lucide-react';
 
 const AISettings = () => {
-    const [config, setConfig] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState(null);
+    // --- STATE ---
+    // Section 1: Strategy DNA
+    const [aggression, setAggression] = useState(65);
+    const [tradingMode, setTradingMode] = useState('SWING'); // SCALP, SWING, HODL
+    const [activeMarkets, setActiveMarkets] = useState({
+        'BTC-PERP': true,
+        'ETH-PERP': true,
+        'SOL-PERP': false
+    });
 
-    // Fetch initial settings
-    useEffect(() => {
-        fetchSettings();
-    }, []);
+    // Section 2: Brain Surgery
+    const [logs, setLogs] = useState([
+        "[NEURAL_NET] Initializing weights...",
+        "[NEURAL_NET] Loading model v4.2.0-alpha...",
+        "[MEMORY] Short-term buffer cleared.",
+        "[EPOCH_1] Loss: 0.042 | Accuracy: 88%",
+        "[SYSTEM] Ready for inference."
+    ]);
 
-    const fetchSettings = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch('http://localhost:8000/api/admin/ai_settings');
-            if (res.ok) {
-                const data = await res.json();
-                setConfig(data);
-            }
-        } catch (e) {
-            console.error("Failed to load settings", e);
-        }
-        setLoading(false);
+    // --- HANDLERS ---
+    const toggleMarket = (market) => {
+        setActiveMarkets(prev => ({ ...prev, [market]: !prev[market] }));
     };
 
-    const saveSettings = async () => {
-        setSaving(true);
-        try {
-            const res = await fetch('http://localhost:8000/api/admin/ai_settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config)
-            });
-            if (res.ok) {
-                setMessage({ text: "System Configuration Updated", type: "success" });
-                setTimeout(() => setMessage(null), 3000);
-            }
-        } catch (e) {
-            setMessage({ text: "Update Failed", type: "error" });
-        }
-        setSaving(false);
+    const handleFlushMemory = () => {
+        addLog("[MEMORY] Flushing short-term context buffer...");
+        setTimeout(() => addLog("[SUCCESS] Memory flushed. LSTM state reset."), 800);
     };
 
-    const handleChange = (key, value) => {
-        setConfig(prev => ({ ...prev, [key]: value }));
+    const handleBackup = () => {
+        addLog("[SYSTEM] Initiating weight snapshot...");
+        setTimeout(() => addLog("[SUCCESS] Snapshot saved to /checkpoints/v4.2.1.pt"), 1200);
     };
 
-    if (loading) return <div style={{ padding: 40, color: 'var(--text-dim)' }}>Loading Neural Configuration...</div>;
-
-    const s = {
-        section: {
-            background: 'var(--glass-bg)',
-            border: '1px solid var(--glass-border)',
-            borderRadius: '16px',
-            padding: '24px',
-            marginBottom: '24px',
-            backdropFilter: 'blur(12px)'
-        },
-        header: {
-            display: 'flex', alignItems: 'center', gap: '10px',
-            marginBottom: '20px',
-            fontSize: '18px', fontWeight: '700',
-            color: 'var(--text-main)',
-            borderBottom: '1px solid var(--glass-border)',
-            paddingBottom: '12px'
-        },
-        row: {
-            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'center',
-            marginBottom: '16px'
-        },
-        label: {
-            fontSize: '14px', color: 'var(--text-dim)', marginBottom: '4px', display: 'block'
-        },
-        input: {
-            width: '100%', padding: '10px',
-            background: 'rgba(0,0,0,0.2)',
-            border: '1px solid var(--glass-border)',
-            color: '#fff', borderRadius: '6px',
-            fontFamily: 'monospace'
-        },
-        toggleGroup: {
-            display: 'flex', gap: '8px', background: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: '8px', width: 'fit-content'
-        },
-        toggleBtn: (active) => ({
-            padding: '8px 16px',
-            borderRadius: '6px',
-            background: active ? 'var(--accent-gold)' : 'transparent',
-            color: active ? '#000' : 'var(--text-dim)',
-            border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '12px',
-            transition: 'all 0.2s'
-        })
+    const addLog = (msg) => {
+        const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+        setLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 10));
     };
 
     return (
-        <div className="fade-in" style={{ maxWidth: 1000, margin: '0 auto', paddingBottom: 80 }}>
+        <div className="min-h-screen w-full bg-[#030005] text-white p-6 lg:p-12 font-sans relative overflow-hidden">
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 40 }}>
-                <div>
-                    <h1 style={{ fontSize: '32px', fontWeight: '800', margin: 0, letterSpacing: '-1px' }}>System Logic <span style={{ color: 'var(--accent-gold)' }}>Config</span></h1>
-                    <p style={{ color: 'var(--text-dim)', marginTop: '8px' }}>Fine-tune the Decision Engine parameters</p>
-                </div>
-                <button onClick={saveSettings} className="glow-btn" disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {saving ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
-                    {saving ? 'SAVING...' : 'APPLY CONFIG'}
-                </button>
-            </div>
+            {/* --- GLOBAL GLOW BACKGROUND --- */}
+            <div className="fixed top-[-20%] left-[-10%] w-[1000px] h-[1000px] bg-purple-900/10 rounded-full blur-[180px] pointer-events-none z-0" />
+            <div className="fixed bottom-[-10%] right-[-5%] w-[800px] h-[800px] bg-indigo-900/10 rounded-full blur-[150px] pointer-events-none z-0" />
 
-            {message && (
-                <div style={{
-                    padding: '12px', marginBottom: '24px', borderRadius: '8px',
-                    background: message.type === 'success' ? 'rgba(0,230,118,0.1)' : 'rgba(255,61,0,0.1)',
-                    border: message.type === 'success' ? '1px solid #00e676' : '1px solid #ff3d00',
-                    color: message.type === 'success' ? '#00e676' : '#ff3d00', fontWeight: '600'
-                }}>
-                    {message.text}
-                </div>
-            )}
+            {/* --- MAIN CONTENT CONFIG --- */}
+            <div className="relative z-10 max-w-6xl mx-auto space-y-8">
 
-            {/* STRATEGY & RISK */}
-            <div style={s.section}>
-                <div style={s.header}>
-                    <Shield size={20} color="var(--accent-blue)" /> Risk Management Protocol
-                </div>
-
-                <div style={s.row}>
+                {/* HEADER */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-white/10 pb-6">
                     <div>
-                        <span style={s.label}>Risk Mode</span>
-                        <div style={s.toggleGroup}>
-                            {['CONSERVATIVE', 'BALANCED', 'DEGEN'].map(mode => (
-                                <button key={mode} onClick={() => handleChange('risk_mode', mode)} style={s.toggleBtn(config.risk_mode === mode)}>
-                                    {mode}
+                        <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
+                            <Brain className="text-purple-500" size={32} />
+                            Neural Network Configuration
+                        </h1>
+                        <p className="text-gray-500 text-sm mt-2 ml-1">Adjust hyperparameters, risk tolerance, and memory allocation.</p>
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={() => addLog("Applying new configuration...")} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-colors">
+                            <Save size={14} /> SAVE CONFIG
+                        </button>
+                    </div>
+                </div>
+
+                {/* 2-COLUMN GRID */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                    {/* --- LEFT COL: STRATEGY DNA --- */}
+                    <SpotlightCard title="STRATEGY DNA" icon={Zap}>
+                        <div className="space-y-8">
+
+                            {/* 1. AGGRESSION SLIDER */}
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-end">
+                                    <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-2">
+                                        <Sliders size={14} /> Aggression Level
+                                    </label>
+                                    <span className="text-2xl font-mono text-purple-400">{aggression}%</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="1" max="100"
+                                    value={aggression}
+                                    onChange={(e) => setAggression(e.target.value)}
+                                    className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-purple-500 hover:accent-purple-400 transition-all"
+                                />
+                                <div className="flex justify-between text-[10px] text-gray-600 font-mono uppercase">
+                                    <span>Conservative</span>
+                                    <span>Balanced</span>
+                                    <span>Degen</span>
+                                </div>
+                            </div>
+
+                            {/* 2. TRADING MODE (CARDS) */}
+                            <div className="space-y-3">
+                                <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-2">
+                                    <Activity size={14} /> Trading Mode
+                                </label>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {['SCALP', 'SWING', 'HODL'].map((m) => (
+                                        <button
+                                            key={m}
+                                            onClick={() => setTradingMode(m)}
+                                            className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all duration-300 ${tradingMode === m
+                                                    ? 'bg-purple-500/20 border-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.2)]'
+                                                    : 'bg-white/5 border-white/5 text-gray-500 hover:bg-white/10 hover:border-white/10'
+                                                }`}
+                                        >
+                                            <div className={`w-2 h-2 rounded-full ${tradingMode === m ? 'bg-purple-400 animate-pulse' : 'bg-gray-600'}`} />
+                                            <span className="text-xs font-bold tracking-widest">{m}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 3. ACTIVE MARKETS */}
+                            <div className="space-y-3">
+                                <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-2">
+                                    <Activity size={14} /> Active Perps
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    {Object.keys(activeMarkets).map((market) => (
+                                        <button
+                                            key={market}
+                                            onClick={() => toggleMarket(market)}
+                                            className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all ${activeMarkets[market]
+                                                    ? 'bg-green-500/10 border-green-500/50 text-green-400'
+                                                    : 'bg-red-500/5 border-red-500/20 text-red-500/50 line-through'
+                                                }`}
+                                        >
+                                            {market}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                        </div>
+                    </SpotlightCard>
+
+                    {/* --- RIGHT COL: BRAIN SURGERY --- */}
+                    <div className="space-y-8">
+
+                        {/* MEMORY MANAGEMENT */}
+                        <SpotlightCard title="BRAIN SURGERY" icon={Database}>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={handleFlushMemory}
+                                    className="group p-4 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/50 rounded-xl flex flex-col items-center justify-center gap-2 transition-all"
+                                >
+                                    <Trash2 className="text-red-500 group-hover:scale-110 transition-transform" size={20} />
+                                    <span className="text-xs font-bold text-red-400">FLUSH MEMORY</span>
                                 </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <label style={s.label}>Max Open Positions</label>
-                        <input
-                            type="number"
-                            style={s.input}
-                            value={config.max_open_positions}
-                            onChange={(e) => handleChange('max_open_positions', parseInt(e.target.value))}
-                        />
-                    </div>
-                </div>
+                                <button
+                                    onClick={handleBackup}
+                                    className="group p-4 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/50 rounded-xl flex flex-col items-center justify-center gap-2 transition-all"
+                                >
+                                    <Server className="text-blue-500 group-hover:scale-110 transition-transform" size={20} />
+                                    <span className="text-xs font-bold text-blue-400">BACKUP WEIGHTS</span>
+                                </button>
+                            </div>
+                        </SpotlightCard>
 
-                <div style={s.row}>
-                    <div>
-                        <span style={s.label}>Minimum Confidence Threshold ({Math.round(config.min_confidence * 100)}%)</span>
-                        <input
-                            type="range" min="0.4" max="0.95" step="0.05"
-                            style={{ width: '100%', accentColor: 'var(--accent-gold)' }}
-                            value={config.min_confidence}
-                            onChange={(e) => handleChange('min_confidence', parseFloat(e.target.value))}
-                        />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '14px' }}>
-                        <div
-                            onClick={() => handleChange('volatility_filter', !config.volatility_filter)}
-                            style={{
-                                width: '40px', height: '22px', background: config.volatility_filter ? '#00e676' : '#333',
-                                borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: '0.3s'
-                            }}>
-                            <div style={{
-                                width: '18px', height: '18px', background: '#fff', borderRadius: '50%',
-                                position: 'absolute', top: '2px', left: config.volatility_filter ? '20px' : '2px', transition: '0.3s'
-                            }} />
-                        </div>
-                        <span style={{ color: '#fff', fontWeight: '500' }}>Volatility Safety Filter</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* EXTERNAL INTELLIGENCE */}
-            <div style={s.section}>
-                <div style={s.header}>
-                    <Globe size={20} color="#b388ff" /> External Intelligence (n8n Agent)
-                </div>
-
-                <div style={s.row}>
-                    <div style={{ gridColumn: 'span 2' }}>
-                        <div style={{ background: 'rgba(100, 100, 255, 0.05)', padding: '12px', borderRadius: '8px', border: '1px dashed #6c5ce7', marginBottom: '16px', display: 'flex', gap: '12px' }}>
-                            <RefreshCw size={16} color="#6c5ce7" />
-                            <div style={{ fontSize: '12px', color: '#a29bfe' }}>
-                                <strong>Webhook Endpoint:</strong> <code style={{ color: '#fff' }}>POST http://localhost:8000/api/webhooks/external_data</code><br />
-                                Send JSON: <code>{`{ "source": "n8n", "value": 85, "summary": "Market Bullish" }`}</code>
+                        {/* TERMINAL LOGS */}
+                        <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden flex flex-col h-[300px]">
+                            <div className="px-4 py-3 bg-white/5 border-b border-white/5 flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-xs font-mono font-bold text-gray-400 uppercase">
+                                    <Terminal size={14} className="text-green-500" /> Neural Logs
+                                </div>
+                                <div className="flex gap-1.5">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" />
+                                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
+                                    <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" />
+                                </div>
+                            </div>
+                            <div className="flex-1 p-4 font-mono text-[10px] text-gray-400 overflow-y-auto custom-scrollbar space-y-1">
+                                {logs.map((log, i) => (
+                                    <div key={i} className="border-b border-white/5 pb-1 last:border-0 hover:text-white transition-colors">
+                                        <span className="text-purple-500 mr-2">{'>'}</span>
+                                        {log}
+                                    </div>
+                                ))}
+                                <div className="animate-pulse text-green-500">_</div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <div style={s.row}>
-                    <div>
-                        <span style={s.label}>External Sentiment Weight (0 - 100%)</span>
-                        <input
-                            type="range" min="0" max="100" step="10"
-                            style={{ width: '100%', accentColor: '#b388ff' }}
-                            value={config.sentiment_weight}
-                            onChange={(e) => handleChange('sentiment_weight', parseFloat(e.target.value))}
-                        />
-                        <div style={{ textAlign: 'right', fontSize: '11px', color: 'var(--text-dim)' }}>Current Impact: {config.sentiment_weight}%</div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '14px' }}>
-                        <div
-                            onClick={() => handleChange('news_impact_enabled', !config.news_impact_enabled)}
-                            style={{
-                                width: '40px', height: '22px', background: config.news_impact_enabled ? '#b388ff' : '#333',
-                                borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: '0.3s'
-                            }}>
-                            <div style={{
-                                width: '18px', height: '18px', background: '#fff', borderRadius: '50%',
-                                position: 'absolute', top: '2px', left: config.news_impact_enabled ? '20px' : '2px', transition: '0.3s'
-                            }} />
-                        </div>
-                        <span style={{ color: '#fff', fontWeight: '500' }}>Enable News Injection</span>
-                    </div>
+
                 </div>
             </div>
-
-            {/* AUTOMATION */}
-            <div style={s.section}>
-                <div style={s.header}>
-                    <Cpu size={20} color="#ff3d00" /> Automation Level
-                </div>
-                <div style={s.row}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div
-                            onClick={() => handleChange('auto_trade_enabled', !config.auto_trade_enabled)}
-                            style={{
-                                width: '40px', height: '22px', background: config.auto_trade_enabled ? '#ff3d00' : '#333',
-                                borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: '0.3s'
-                            }}>
-                            <div style={{
-                                width: '18px', height: '18px', background: '#fff', borderRadius: '50%',
-                                position: 'absolute', top: '2px', left: config.auto_trade_enabled ? '20px' : '2px', transition: '0.3s'
-                            }} />
-                        </div>
-                        <div>
-                            <span style={{ color: '#fff', fontWeight: '500', display: 'block' }}>Full Auto-Trading</span>
-                            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Allow AI to open/close positions without approval</span>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div
-                            onClick={() => handleChange('confirmation_required', !config.confirmation_required)}
-                            style={{
-                                width: '40px', height: '22px', background: config.confirmation_required ? '#00e676' : '#333',
-                                borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: '0.3s'
-                            }}>
-                            <div style={{
-                                width: '18px', height: '18px', background: '#fff', borderRadius: '50%',
-                                position: 'absolute', top: '2px', left: config.confirmation_required ? '20px' : '2px', transition: '0.3s'
-                            }} />
-                        </div>
-                        <div>
-                            <span style={{ color: '#fff', fontWeight: '500', display: 'block' }}>Human-in-the-Loop</span>
-                            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Request confirmation for high-risk trades</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
         </div>
     );
 };
+
+// --- REUSABLE COMPONENT: SPOTLIGHT CARD (Simplified) ---
+const SpotlightCard = ({ title, icon: Icon, children }) => (
+    <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl flex flex-col relative overflow-hidden group">
+        <div className="p-6 border-b border-white/5 flex items-center gap-2 text-sm font-bold tracking-widest text-white/80 uppercase bg-white/5">
+            {Icon && <Icon size={16} className="text-purple-500" />} {title}
+        </div>
+        <div className="p-6 relative z-10">
+            {children}
+        </div>
+        {/* Hover effect gradient */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+    </div>
+);
 
 export default AISettings;

@@ -7,9 +7,12 @@ from datetime import datetime
 
 # Component Imports
 from backend.ai_core import RedlineAICore
+from backend.data.news import NewsAggregator
+from backend.google_reporting import GoogleReporter  # <--- NEW IMPORT
 from ml.scanner import MarketScanner
 from ml.training import OfflineTrainer
 from ml.evolution import GeneticEvolution
+from trading.wallet import WalletManager
 
 # Logging
 logger = logging.getLogger("AUTONOMOUS_NODE")
@@ -40,6 +43,8 @@ class RedlineAutonomousNode:
         self.ai_core = RedlineAICore()
         self.scanner = MarketScanner(self.ai_core)
         self.trainer = OfflineTrainer()
+        self.news_engine = NewsAggregator()
+        self.reporter = GoogleReporter() # <--- NEW REPORTER
         
         # State
         self.latest_scan_results = []
@@ -80,22 +85,89 @@ class RedlineAutonomousNode:
             # Silence connection errors (API might be down), log others
             pass
 
+    def _broadcast_wallet_state(self):
+        """Broadcasting wallet state updates to the Frontend."""
+        try:
+            data = WalletManager.get_wallet_data()
+            payload = {
+                "total_balance": data.get("balance", 0.0),
+                "pnl_percent": 0.0,  # Placeholder, needs history logic
+                "assets": data.get("assets", []),
+                "recent_transactions": data.get("history", [])[:10]
+            }
+            self._broadcast_update("WALLET_UPDATE", payload)
+        except Exception as e:
+            logger.error(f"Failed to broadcast wallet state: {e}")
+
+    def execute_trade(self, symbol, action, amount, price, profit=0.0):
+        """
+        Executes a trade and logs it to Google Sheets.
+        """
+        logger.info(f"⚡ EXECUTING TRADE: {action} {symbol} @ ${price}")
+        
+        # 1. Update Internal Wallet (Mock/Simulated)
+        # In a real scenario, this would call Binance API or WalletManager
+        # WalletManager.update_balance(...) 
+        
+        # 2. LOG TO GOOGLE SHEETS
+        self.reporter.log_trade(
+            symbol=symbol,
+            action=action,
+            price=price,
+            amount=amount,
+            profit=profit
+        )
+        
+        # 3. Broadcast Event
+        self._broadcast_update("TRADE_EXECUTED", {
+            "symbol": symbol,
+            "action": action,
+            "price": price,
+            "amount": amount
+        })
+
     def _life_cycle(self):
         """The Infinite Loop of the Organism."""
         while self.running:
             try:
+                # --- PHASE 0: SENSORY INPUT (News/Sentiment) ---
+                news_item = self.news_engine.fetch_latest_sentiment()
+                if news_item:
+                    score = news_item['sentiment_score']
+                    logger.info(f"📰 {news_item['source']}: {news_item['headline']} (Score: {score})")
+                    
+                    # React to Sentiment
+                    if score > 0.8:
+                        logger.info(f"[BRAIN] Positive News Detected! Adjusting aggression parameters.")
+                    elif score < -0.8:
+                        logger.info(f"[BRAIN] FUD Detected. Tightening Stop-Loss.")
+
+                    # Broadcast to Frontend HUD/Logs
+                    self._broadcast_update("NEWS_UPDATE", news_item)
+
+
                 # --- PHASE A: SCANNING (Senses) ---
                 self.status = "SCANNING"
-                logger.info(f"👁️ Phase A: Scanning Markets... [{datetime.now().strftime('%H:%M:%S')}]")
+                # Reduce log noise, only log every 10th cycle or significant event? 
+                # Keeping it verbose for demo as requested.
+                # logger.info(f"👁️ Phase A: Scanning Markets... [{datetime.now().strftime('%H:%M:%S')}]")
                 
                 # Run Scanner
                 results = self.scanner.run(self.config)
                 if results:
                     self.latest_scan_results = results
-                    logger.info(f"👁️ Scan Complete. Found {len(results)} opportunities.")
+                    # logger.info(f"👁️ Scan Complete. Found {len(results)} opportunities.")
                     self._broadcast_update("SCAN_COMPLETE", results)
+                    
+                    # AUTO TRADING CHECK (Demo Logic)
+                    if self.config.get("execution_enabled"):
+                        for res in results:
+                            if res['confidence'] > 0.9: # High conviction
+                                self.execute_trade(res['symbol'], res['signal'], 0.1, res['price'])
+
                 else:
-                    logger.info("👁️ Scan Complete. No opportunities found.")
+                    # logger.info("👁️ Scan Complete. No opportunities found.")
+                    pass
 
                 # --- PHASE B: EVOLUTION (Self-Improvement) ---
                 current_time = time.time()
@@ -115,11 +187,12 @@ class RedlineAutonomousNode:
                     logger.info(f"🧬 Evolution Cycle Complete. Evolved: {evolved}")
                     
                     self._broadcast_update("SYSTEM_EVENT", {"msg": "System Evolved", "details": f"New Gen: {evolved}"})
+                    self._broadcast_wallet_state()
                 
                 # --- PHASE C: IDLE (Digestion) ---
                 self.status = "IDLE"
-                # logger.info("💤 Phase C: Resting for 60s...")
-                time.sleep(60)
+                # Faster cycle for dynamic news updates
+                time.sleep(5) 
 
             except Exception as e:
                 logger.error(f"❌ CRITICAL ERROR in Life Cycle: {e}")

@@ -336,6 +336,13 @@ class InternalWebhookRequest(BaseModel):
     type: str  # e.g. "SCAN_COMPLETE", "SYSTEM_EVENT"
     payload: dict  # The actual data
 
+class TradingViewAlert(BaseModel):
+    passphrase: str
+    ticker: str      # e.g., "BTCUSDT"
+    action: str      # "BUY", "SELL", "CLOSE"
+    price: float
+    confidence: int = 100
+
 @app.post("/api/webhook/internal")
 async def internal_webhook(req: InternalWebhookRequest):
     """
@@ -347,6 +354,40 @@ async def internal_webhook(req: InternalWebhookRequest):
         "timestamp": datetime.now().isoformat()
     })
     return {"status": "BROADCASTED"}
+
+@app.post("/api/webhook/tradingview")
+async def tradingview_webhook(alert: TradingViewAlert):
+    """
+    Secure Webhook for TradingView Alerts.
+    """
+    if alert.passphrase != "REDLINE_SECURE_KEY":
+        raise HTTPException(status_code=401, detail="Invalid Security Passphrase")
+    
+    # Log the signal
+    print(f"📈 [TRADINGVIEW] Signal: {alert.action} {alert.ticker} @ {alert.price} (Conf: {alert.confidence}%)")
+    
+    # Broadcast to Frontend
+    await manager.broadcast({
+        "type": "EXTERNAL_SIGNAL",
+        "payload": {
+            "source": "TradingView",
+            "ticker": alert.ticker,
+            "action": alert.action,
+            "price": alert.price,
+            "confidence": alert.confidence
+        },
+        "timestamp": datetime.now().isoformat()
+    })
+
+    # Forward to Orchestrator (if running)
+    if orchestrator.is_running:
+         orchestrator.on_tick({
+             'symbol': alert.ticker.replace("USDT", "/USDT"),
+             'price': alert.price,
+             'vol': 0 # External signal doesn't imply volume
+         })
+    
+    return {"status": "received", "signal": f"{alert.action} {alert.ticker}"}
 
 # --- WEBHOOKS: n8n / EXTERNAL ---
 @app.post("/api/webhooks/external_data")
@@ -452,6 +493,17 @@ def run_scanner():
 # --- DATA ENDPOINTS ---
 @app.get("/api/wallet")
 def wallet(): return WalletManager.get_wallet_data()
+
+@app.get("/api/wallet/state")
+def wallet_state():
+    """Returns the detailed wallet state for the Frontend."""
+    data = WalletManager.get_wallet_data()
+    return {
+        "total_balance": data.get("balance", 0.0),
+        "pnl_percent": 0.0, # Placeholder
+        "assets": data.get("assets", []),
+        "recent_transactions": data.get("history", [])
+    }
 
 @app.get("/api/trading/assets")
 def wallet_assets(): return WalletManager.get_wallet_data().get("assets", [])

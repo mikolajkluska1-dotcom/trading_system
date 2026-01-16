@@ -53,6 +53,7 @@ const AppContent = () => {
       {activeTab === 'ai-settings' && <AISettings />}
       {activeTab === 'notifications' && <Notifications />}
       {activeTab === 'user-settings' && <UserSettings />}
+      {activeTab === 'autopilot' && <TradingHub />}
     </OpsLayout>
   );
 };

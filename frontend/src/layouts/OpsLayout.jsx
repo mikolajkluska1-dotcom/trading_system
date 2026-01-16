@@ -102,12 +102,12 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
             >
               {/* Avatar Display */}
               <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10 group-hover:border-purple-500/50 transition-colors">
-                <img src="/assets/ai_avatar.png" alt="Avatar" className="w-full h-full object-cover opacity-80 group-hover:opacity-100" />
+                <img src={user?.avatar || "/assets/ai_avatar.png"} alt="Avatar" className="w-full h-full object-cover opacity-80 group-hover:opacity-100" />
               </div>
 
               <div className="hidden sm:block">
-                <div className="text-sm font-bold text-white leading-tight group-hover:text-purple-400 transition-colors">{user?.username || 'OPERATOR'}</div>
-                <div className="text-[10px] text-gray-500 font-mono">View Profile</div>
+                <div className="text-sm font-bold text-white leading-tight group-hover:text-purple-400 transition-colors">{user?.username || 'Operator'}</div>
+                <div className="text-[10px] text-gray-500 font-mono">{user?.role || 'Admin'}</div>
               </div>
             </div>
 
