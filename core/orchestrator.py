@@ -6,6 +6,8 @@ from ml.scanner import MarketScanner
 from trading.decision import DecisionEngine
 from trading.execution import ExecutionEngine
 from trading.position_manager import PositionManager
+from backend.data.news import NewsAggregator
+from backend.google_reporting import GoogleReporter
 
 class Orchestrator:
     """
@@ -23,6 +25,10 @@ class Orchestrator:
         self.decision_engine = DecisionEngine(mode)
         self.execution_engine = ExecutionEngine(mode)
         self.position_manager = PositionManager(mode)
+        
+        # External Engines
+        self.reporter = GoogleReporter()
+        self.news_engine = NewsAggregator()
 
         log_event(f"ORCHESTRATOR READY [{self.mode}]", "INFO")
         
@@ -137,6 +143,15 @@ class Orchestrator:
             await self.broadcast("MISSION_START", {"message": "Starting New Cycle..."})
             await asyncio.sleep(0.1)
 
+            # --- SENSORY PHASE: NEWS CHECK ---
+            news_item = self.news_engine.fetch_latest_sentiment()
+            if news_item:
+                logger.info(f"NEWS: {news_item['headline']}")
+                await self.broadcast("NEWS_UPDATE", news_item)
+                if abs(news_item['sentiment_score']) > 0.7:
+                     log_event(f"News Impact: {news_item['headline'][:30]}...", "WARN")
+                     await asyncio.sleep(1)
+            
             # 1. SCAN
             logger.info("SCANNING: Broadcasting scan protocol...")
             log_event("SCANNING GLOBAL LEDGER (Binance/Bybit)...", "INFO")
@@ -249,6 +264,18 @@ class Orchestrator:
             logger.info(f"MISSION COMPLETE. NET PROFIT: +${profit:.2f}")
             log_event(f"MISSION COMPLETE. NET PROFIT: +${profit:.2f}", "SUCCESS")
             
+            # --- GOOGLE SHEETS LOGGING (LIVE) ---
+            try:
+                self.reporter.log_trade(
+                    symbol=symbol,
+                    action="SELL", # We are logging the full cycle profit here
+                    price=exit_price,
+                    amount=trade_qty,
+                    profit=profit
+                )
+            except Exception as e:
+                logger.error(f"Google Sheets Log Failed: {e}")
+
             await self.broadcast("MISSION_COMPLETE", {"message": "Cycle Complete"})
             await self.broadcast("MISSION_SUMMARY", {
                 "symbol": symbol,

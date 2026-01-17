@@ -1,189 +1,165 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Zap, Shield, Cpu, Layers, Terminal, AlertTriangle } from 'lucide-react';
-import { useEvents } from '../ws/useEvents';
+import React from 'react';
+import { useMission } from '../context/MissionContext';
+import { Activity, Zap, Shield, Power, Cpu, Network, Lock } from 'lucide-react';
+import HudItem from '../components/HUD/HudItem';
 
 const TradingHub = () => {
-    // 2. DATA CONNECTION: WebSockets (with Mock Data Fallback)
-    const [scannerResults, setScannerResults] = useState([]); // Start empty
+    // Connect to the Mission Context (Central Logic)
+    const { isAiActive, toggleAiCore, missionStatus, logs } = useMission();
 
-    const [systemStatus, setSystemStatus] = useState("SYSTEM ONLINE");
-
-    // WebSocket Logic
-    const { lastMessage } = useEvents();
-
-    useEffect(() => {
-        if (lastMessage?.type === 'SCAN_COMPLETE' || lastMessage?.type === 'OPPORTUNITY_FOUND') {
-            // Logic: If payload is array, set it. If single item, prepend it.
-            const newData = Array.isArray(lastMessage.payload) ? lastMessage.payload : [lastMessage.payload];
-            setScannerResults(prev => [...newData, ...prev].slice(0, 10)); // Keep last 10
-
-            setSystemStatus("DATA RECEIVED");
-            setTimeout(() => setSystemStatus("SYSTEM ONLINE"), 2000);
-        }
-    }, [lastMessage]);
+    // Get latest log for status line
+    const latestLog = logs.length > 0 ? logs[0].message : "SYSTEM READY";
 
     return (
-        <div className="relative min-h-screen w-full bg-[#030005] text-white overflow-hidden selection:bg-purple-500/30 font-sans">
+        <div className="relative min-h-screen bg-[#050505] text-white overflow-hidden flex flex-col items-center justify-center font-mono selection:bg-green-500/30">
 
-            {/* --- GLOBAL PURPLE GLOW BACKGROUND (z-0) --- */}
-            <div className="fixed top-[-20%] left-[-10%] w-[1000px] h-[1000px] bg-purple-900/20 rounded-full blur-[180px] pointer-events-none z-0 animate-pulse duration-[10s]" />
-            <div className="fixed bottom-[-10%] right-[-5%] w-[800px] h-[800px] bg-indigo-900/10 rounded-full blur-[150px] pointer-events-none z-0" />
-            <div className="fixed top-[40%] left-[30%] w-[500px] h-[500px] bg-purple-600/5 rounded-full blur-[120px] pointer-events-none z-0" />
+            {/* BACKGROUND EFFECTS */}
+            <div className={`absolute inset-0 transition-opacity duration-1000 pointer-events-none ${isAiActive ? 'opacity-20' : 'opacity-5'}`}>
+                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-green-900 via-black to-black" />
+            </div>
 
-            {/* --- MAIN CONTENT (z-10) --- */}
-            <div className="relative z-10 h-screen flex flex-col">
+            {/* --- TOP HUD --- */}
+            <div className="absolute top-0 w-full p-6 flex justify-between items-start z-20">
+                <div className="flex gap-4">
+                    <HudItem label="CPU LOAD" value="12%" icon={<Cpu size={16} />} color="text-purple-400" />
+                    <HudItem label="MEMORY" value="3.4GB" icon={<Activity size={16} />} color="text-blue-400" />
+                </div>
+                <div className="flex gap-4">
+                    <HudItem label="NETWORK" value="24ms" icon={<Network size={16} />} color="text-green-400" />
+                    <HudItem label="SECURITY" value="MAX" icon={<Shield size={16} />} color="text-yellow-400" />
+                </div>
+            </div>
 
-                {/* STATUS BAR */}
-                <div className="h-12 border-b border-white/5 bg-black/40 backdrop-blur-md flex items-center px-6 justify-between text-xs font-mono text-gray-500">
-                    <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-2 text-green-500 font-bold"><div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /> DATABASE CONNECTED</span>
-                        <span>|</span>
-                        <span>GENOME: V2.5 (STABLE)</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-purple-400 font-bold">
-                        <Cpu size={12} /> REDLINE AUTONOMOUS SYSTEM
-                    </div>
+            {/* --- CENTRAL AVATAR CONTAINER --- */}
+            <div className="relative z-10 flex flex-col items-center">
+
+                {/* STATUS HEADER */}
+                <div className="mb-8 flex items-center gap-3 px-6 py-2 rounded-full border border-white/10 bg-black/50 backdrop-blur-md">
+                    <div className={`w-3 h-3 rounded-full ${isAiActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                    <span className="tracking-[0.2em] text-xs font-bold text-gray-400">
+                        {isAiActive ? 'NEURAL LINK: ESTABLISHED' : 'SYSTEM STANDBY'}
+                    </span>
                 </div>
 
-                {/* DASHBOARD GRID */}
-                <div className="flex-1 grid grid-cols-12 gap-6 p-6 lg:p-8 overflow-hidden">
+                {/* AVATAR RING */}
+                <div className="relative group mb-12">
+                    {/* Animated Glow Ring */}
+                    <div className={`absolute -inset-4 rounded-full border border-dashed transition-all duration-1000 ${isAiActive
+                        ? 'border-green-500/50 animate-[spin_10s_linear_infinite] scale-110'
+                        : 'border-gray-800 scale-100'
+                        }`} />
 
-                    {/* LEFT PANEL: Live Opportunities (3 cols) */}
-                    <div className="col-span-12 lg:col-span-3 flex flex-col gap-4 h-full overflow-hidden">
-                        <GlassPanel title="lIVE OPPORTUNITIES" icon={<Activity size={16} className="text-purple-500" />}>
-                            <div className="flex flex-col gap-2 overflow-y-auto h-full pr-2 custom-scrollbar">
-                                {scannerResults.length > 0 ? (
-                                    scannerResults.map((item, idx) => (
-                                        <ScannerCard key={idx} item={item} />
-                                    ))
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2 opacity-50">
-                                        <Activity className="animate-pulse" size={24} />
-                                        <span className="text-[10px] font-mono uppercase tracking-widest">Scanning Market...</span>
+                    {/* Inner Glow */}
+                    <div className={`absolute inset-0 rounded-full blur-3xl transition-all duration-500 ${isAiActive ? 'bg-green-500/20' : 'bg-transparent'
+                        }`} />
+
+                    {/* AVATAR RING */}
+                    <div className="relative group mb-12">
+                        {/* DYNAMIC RING ANIMATION */}
+                        <div className={`absolute -inset-4 rounded-full border-2 border-dashed transition-all duration-1000 ${isAiActive
+                                ? 'border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)] animate-[spin_4s_linear_infinite]'
+                                : 'border-red-600/60 shadow-none scale-100'
+                            }`} />
+
+                        {/* Inner Glow */}
+                        <div className={`absolute inset-0 rounded-full blur-3xl transition-all duration-500 ${isAiActive ? 'bg-green-500/20' : 'bg-red-500/10'
+                            }`} />
+
+                        {/* THE AVATAR IMAGE */}
+                        <div className={`relative w-64 h-64 rounded-full overflow-hidden border-4 transition-colors duration-500 shadow-2xl z-10 bg-black ${isAiActive ? 'border-green-500/50' : 'border-red-900'
+                            }`}>
+                            <img
+                                src="/assets/ai_avatar.png"
+                                alt="AI Avatar"
+                                className={`w-full h-full object-cover transition-all duration-700 ${isAiActive
+                                        ? 'scale-110 brightness-110 saturate-120'
+                                        : 'scale-100 grayscale brightness-75 sepia-[.5] hue-rotate-[-50deg]'
+                                    }`}
+                                onError={(e) => { e.target.onerror = null; e.target.src = "https://via.placeholder.com/256/000000/00FF00?text=AI+CORE"; }}
+                            />
+
+                            {/* Scan Line Overlay (Only when Active) */}
+                            {isAiActive && (
+                                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-green-500/10 to-transparent w-full h-4 animate-[scan_2s_linear_infinite]" />
+                            )}
+                        </div>
+                    </div>
+
+                    {/* ACTIVATE BUTTON (OVERLAY) */}
+                    <button
+                        onClick={() => toggleAiCore(!isAiActive)}
+                        className={`absolute -bottom-6 left-1/2 -translate-x-1/2 px-8 py-3 rounded-xl font-bold tracking-widest uppercase transition-all shadow-xl flex items-center gap-3 border z-20 whitespace-nowrap ${isAiActive
+                            ? 'bg-red-900/80 border-red-500 text-red-200 hover:bg-red-800'
+                            : 'bg-green-900/80 border-green-500 text-green-200 hover:bg-green-800'
+                            }`}
+                    >
+                        <Power size={18} />
+                        {isAiActive ? 'STOP SYSTEM' : 'INITIALIZE'}
+                    </button>
+                </div>
+
+                {/* --- LIVE ACTIVITY FEED (Smart Parser) --- */}
+                <div className="mt-12 w-full max-w-4xl z-20">
+                    <div className="flex items-center justify-between mb-4 px-6 border-b border-gray-800 pb-2">
+                        <h3 className="text-gray-500 text-xs font-bold tracking-[0.3em] uppercase flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full ${isAiActive ? 'bg-green-500 animate-pulse' : 'bg-red-900'}`}></div>
+                            Neural Decision Stream
+                        </h3>
+                        <span className="text-[10px] text-gray-700 font-mono">LIVE FEED PROTOCOL // PORT 8000</span>
+                    </div>
+
+                    <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                        {logs.length === 0 ? (
+                            <div className="p-4 rounded-xl bg-gray-900/30 border border-dashed border-gray-800 text-gray-600 text-center font-mono text-sm">
+                                {isAiActive ? " Awaiting market signals..." : " System Offline. Initialize Core to begin."}
+                            </div>
+                        ) : (
+                            logs.slice().reverse().slice(0, 6).map((log, index) => {
+                                // --- PARSING LOGIC ---
+                                let style = "border-gray-800 bg-black/40 text-gray-500";
+                                let icon = "";
+                                let glow = "";
+
+                                // Cleanup timestamp for cleaner look
+                                const cleanLog = typeof log.message === 'string' ? log.message.replace(/\[.*?\]/g, '').trim() : "System Event";
+
+                                if (cleanLog.includes("BUY")) {
+                                    style = "border-green-900/50 bg-green-900/10 text-green-400";
+                                    icon = "";
+                                    glow = "shadow-[0_0_15px_rgba(74,222,128,0.1)]";
+                                }
+                                else if (cleanLog.includes("SELL")) {
+                                    style = "border-yellow-900/50 bg-yellow-900/10 text-yellow-400";
+                                    icon = "";
+                                    glow = "shadow-[0_0_15px_rgba(250,204,21,0.1)]";
+                                }
+                                else if (cleanLog.includes("SCANNING")) {
+                                    style = "border-blue-900/50 bg-blue-900/10 text-blue-400";
+                                    icon = "";
+                                }
+                                else if (cleanLog.includes("ANALYSIS")) {
+                                    style = "border-purple-900/50 bg-purple-900/10 text-purple-400";
+                                    icon = "";
+                                }
+                                else if (cleanLog.includes("CRITICAL") || cleanLog.includes("ERROR")) {
+                                    style = "border-red-900/50 bg-red-900/10 text-red-400";
+                                    icon = "⚠";
+                                }
+
+                                return (
+                                    <div key={index} className={`flex items-center gap-4 p-3 rounded-lg border ${style} ${glow} backdrop-blur-sm transition-all hover:scale-[1.01]`}>
+                                        <span className="text-lg">{icon}</span>
+                                        <span className="font-mono text-xs tracking-wide">{cleanLog}</span>
                                     </div>
-                                )}
-                            </div>
-                        </GlassPanel>
+                                );
+                            })
+                        )}
                     </div>
-
-                    {/* CENTER PANEL: AI Neural Core (FIXED VISIBILITY) */}
-                    <div className="col-span-6 relative z-20 flex flex-col items-center justify-center min-h-[600px]">
-
-                        {/* 1. THE CORE CONTAINER */}
-                        <div className="relative w-80 h-80 flex items-center justify-center">
-
-                            {/* Pulsing Aura (Background) */}
-                            <div className="absolute inset-0 bg-purple-600/20 blur-[60px] rounded-full animate-pulse"></div>
-
-                            {/* Rotating Rings */}
-                            <div className="absolute inset-0 border border-purple-500/30 rounded-full w-full h-full animate-spin duration-[10s]"></div>
-                            <div className="absolute inset-8 border border-cyan-500/20 rounded-full animate-spin duration-[5s] direction-reverse"></div>
-
-                            {/* MAIN CPU ICON (The visible part) */}
-                            <div className="relative z-30 bg-[#050505] p-8 rounded-full border border-purple-500/50 shadow-[0_0_50px_rgba(168,85,247,0.4)]">
-                                <Cpu size={80} className="text-white drop-shadow-md" />
-                            </div>
-                        </div>
-
-                        {/* 2. STATUS TEXT */}
-                        <div className="mt-10 text-center space-y-2 z-30">
-                            <h2 className="text-3xl font-black text-white tracking-[0.3em]">RL BOT</h2>
-                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-900/30 border border-purple-500/30">
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_#22c55e]"></div>
-                                <span className="text-xs font-mono text-purple-200 tracking-wider">NEURAL NET ACTIVE</span>
-                            </div>
-                        </div>
-
-                        {/* 3. METRICS (Floating below) */}
-                        <div className="absolute bottom-10 flex gap-8">
-                            <div className="text-center">
-                                <div className="text-[10px] text-gray-500 uppercase tracking-widest">Latency</div>
-                                <div className="text-xl font-mono text-white font-bold">---<span className="text-gray-600 text-sm">ms</span></div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-[10px] text-gray-500 uppercase tracking-widest">Accuracy</div>
-                                <div className="text-xl font-mono text-green-400 font-bold">---<span className="text-gray-600 text-sm">%</span></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* RIGHT PANEL: Signals & Stats (3 cols) */}
-                    <div className="col-span-12 lg:col-span-3 flex flex-col gap-4 h-full">
-                        <GlassPanel title="ACTIVE SIGNALS" icon={<Zap size={16} className="text-yellow-500" />}>
-                            <div className="flex flex-col items-center justify-center h-full text-gray-500 text-xs italic gap-2 opacity-50">
-                                <AlertTriangle size={24} />
-                                <span>Waiting for high confidence setup...</span>
-                            </div>
-                        </GlassPanel>
-
-                        <GlassPanel title="SYSTEM HEALTH" icon={<Shield size={16} className="text-green-500" />}>
-                            <div className="grid grid-cols-2 gap-3">
-                                <StatBox label="CPU LOAD" value="0%" color="text-purple-400" />
-                                <StatBox label="MEMORY" value="0GB" color="text-indigo-400" />
-                                <StatBox label="NETWORK" value="0ms" color="text-green-400" />
-                                <StatBox label="UPTIME" value="0h" color="text-white" />
-                            </div>
-                        </GlassPanel>
-                    </div>
-
                 </div>
+
             </div>
         </div>
     );
 };
-
-// --- SUB-COMPONENTS ---
-
-const GlassPanel = ({ title, icon, children }) => (
-    <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl flex flex-col h-full shadow-2xl relative overflow-hidden group">
-        <div className="p-4 border-b border-white/5 flex items-center gap-2 text-xs font-bold tracking-widest text-gray-400 uppercase bg-white/5">
-            {icon} {title}
-        </div>
-        <div className="flex-1 p-4 overflow-hidden relative">
-            {children}
-        </div>
-    </div>
-);
-
-const ScannerCard = ({ item }) => (
-    <motion.div
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-        className="p-3 bg-white/5 border border-white/5 rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors cursor-pointer group"
-    >
-        <div>
-            <div className="font-bold text-gray-200 group-hover:text-white text-sm">{item.symbol}</div>
-            <div className="text-[10px] text-gray-500 font-mono">${item.price?.toLocaleString()}</div>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-            <Badge score={item.score} />
-            <div className={`text-[9px] font-bold tracking-wider ${item.signal === 'STRONG_BUY' ? 'text-green-400' : item.signal === 'SELL' ? 'text-red-400' : 'text-gray-400'}`}>
-                {item.signal}
-            </div>
-        </div>
-    </motion.div>
-);
-
-const Badge = ({ score }) => {
-    let color = "bg-gray-700 text-gray-300";
-    if (score >= 90) color = "bg-purple-500/20 text-purple-300 border border-purple-500/50";
-    else if (score >= 70) color = "bg-green-500/20 text-green-300 border border-green-500/50";
-    else if (score >= 50) color = "bg-yellow-500/20 text-yellow-300 border border-yellow-500/50";
-    else if (score < 50) color = "bg-red-500/20 text-red-300 border border-red-500/50";
-
-    return (
-        <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${color}`}>
-            AI: {score}
-        </div>
-    );
-};
-
-const StatBox = ({ label, value, color = "text-white" }) => (
-    <div className="bg-white/5 p-2 rounded-lg border border-white/5 flex flex-col items-center justify-center">
-        <div className="text-[9px] text-gray-500 mb-0.5">{label}</div>
-        <div className={`font-mono text-sm font-bold ${color}`}>{value}</div>
-    </div>
-);
 
 export default TradingHub;

@@ -102,12 +102,32 @@ class RedlineAICore:
         }
 
         # Dwa półkule mózgu
-        # Dwa półkule mózgu
         self.logic_brain = DecisionEngine()
         self.neural_brain = DeepBrain() # ML V7
         self.whale_watcher = WhaleWatcher() # Copy Trading Module
 
+        # --- ORCHESTRATOR OWNERSHIP (Unified Architecture) ---
+        # Local import to prevent circular dependency:
+        # Orchestrator -> MarketScanner -> RedlineAICore
+        from core.orchestrator import Orchestrator
+        self.orchestrator = Orchestrator(mode=mode, ai_core=self)
+
         logger.info(f"AI CORE INITIALIZED: {self.state}")
+
+    def start(self):
+        """Activates the Orchestrator loop."""
+        if not self.orchestrator.is_running:
+            self.orchestrator.is_running = True
+            # Also set the legacy Orchestrator autopilot if needed
+            self.orchestrator.set_autopilot(True) 
+            logger.info("🟢 AI SYSTEM STARTED (Orchestrator Online)")
+
+    def stop(self):
+        """Stops the Orchestrator loop."""
+        if self.orchestrator.is_running:
+            self.orchestrator.is_running = False
+            self.orchestrator.set_autopilot(False)
+            logger.info("🔴 AI SYSTEM STOPPED (Orchestrator Offline)")
 
     def get_state(self):
         # Dołączamy external context do stanu

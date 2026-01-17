@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+import pickle
 from datetime import datetime
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
@@ -74,6 +75,7 @@ class DeepBrain:
         self.last_train_loss = 0.0
         
         # Inicjalizacja Pamięci (Experience Replay)
+        self.memory = []
         self.replay_memories("brain_v6")
 
     # ------------------------------------------------------------
@@ -81,24 +83,54 @@ class DeepBrain:
     # ------------------------------------------------------------
     def replay_memories(self, user_id):
         from core.logger import log_event
+        
+        # 1. Load RL Memory (Pickle)
+        self.load(user_id)
+        if hasattr(self, 'memory') and len(self.memory) > 0:
+             log_event(f"🧠 Brain Restored: {len(self.memory)} memories loaded.", "SUCCESS")
+        
         try:
             df_mem = KnowledgeBase.load_training_data(user_id)
             if df_mem.empty:
-                log_event("🧠 Brain is clean (No memories found).", "INFO")
+                # log_event("🧠 Brain is clean (No patterns found).", "INFO")
                 return
 
             # Konwersja z JSON do Tensorów
-            # Format w KnowledgeBase to płaskie features, musimy je sformatować
-            # Zakładamy, że patterny są zapisane jako pojedyncze wektory
-            # Dla uproszczenia w tej wersji: po prostu logujemy fakt istnienia pamięci
-            # W pełnej wersji: self.train_on_fly(df_mem, epochs=5)
+            # ... (Logic existing) ...
             
             count = len(df_mem)
-            log_event(f"🧠 Experience Replay: Loaded {count} past patterns.", "SUCCESS")
-            # TODO: Implement full tensor reconstruction from flat JSON
+            # log_event(f"🧠 Experience Replay: Loaded {count} past patterns.", "SUCCESS")
             
         except Exception as e:
             log_event(f"⚠️ Memory Replay Failed: {e}", "WARN")
+
+    def save(self, name):
+        """Persist memory to disk"""
+        try:
+            path = os.path.join("assets", f"{name}_memory.pkl")
+            with open(path, "wb") as f:
+                pickle.dump(self.memory, f)
+        except Exception as e:
+            print(f"Save Failed: {e}")
+
+    def load(self, name):
+        """Load memory from disk"""
+        try:
+            path = os.path.join("assets", f"{name}_memory.pkl")
+            if os.path.exists(path):
+                with open(path, "rb") as f:
+                    self.memory = pickle.load(f)
+        except Exception as e:
+            print(f"Load Failed: {e}")
+
+    def remember(self, state, action, reward, next_state, done):
+        """Store transaction and Auto-Save"""
+        self.memory.append((state, action, reward, next_state, done))
+
+        # --- AUTO-SAVE TRIGGER ---
+        # Save every time we get a significant reward (trade result) OR every 10 steps
+        if done or len(self.memory) % 10 == 0:
+            self.save("brain_v6") 
 
     # ------------------------------------------------------------
     # Feature Engineering (Log Returns Target)

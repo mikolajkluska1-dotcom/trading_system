@@ -1,608 +1,117 @@
-# backend/main.py
-"""
-REDLINE BACKEND — GEN 2.5 (NON-CUSTODIAL)
-FastAPI entrypoint
-Integruje: Live Feed, Indicators, IAM, API Key Management, n8n Support
-"""
-
 import sys
 import os
-import asyncio
-import psutil
-import random
-import pandas as pd
-from datetime import datetime
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if BASE_DIR not in sys.path:
-    sys.path.append(BASE_DIR)
-
-from security.user_manager import UserManager
-from trading.wallet import WalletManager
-from backend.ai_core import RedlineAICore
-from backend.ai_config_manager import AIConfigManager
-from core.orchestrator import Orchestrator
-from core.logger import get_latest_logs
-
+# --- CRITICAL WINDOWS FIX ---
+# Forces UTF-8 encoding to prevent crashes when printing emojis (🧠, 💰)
+# This MUST be the first thing the script does.
 try:
-    from data.feed import DataFeed
-    FEED_AVAILABLE = True
-except ImportError:
-    print(" WARNING: DataFeed not found. Scanner will use mock data.")
-    FEED_AVAILABLE = False
+    if sys.platform == "win32":
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+except AttributeError:
+    pass
+# ----------------------------
 
-app = FastAPI(title="REDLINE API", version="2.6")
+from typing import List
 
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
+# IMPORTS
+from backend.ai_core import RedlineAICore
+from backend.events_server import start_background_loop
+from core.db import Database
+
+# --- REAL-TIME LOG CAPTURE ---
+# This buffer holds the logs to send to the Frontend
+LOG_BUFFER: List[str] = []
+
+class MemoryLogHandler(logging.Handler):
+    """Intercepts logs and stores the last 50 lines in memory."""
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            # Filter out boring logs (optional)
+            if "GET /api" in msg or "WebSocket" in msg:
+                return 
+            
+            LOG_BUFFER.append(msg)
+            if len(LOG_BUFFER) > 50:
+                LOG_BUFFER.pop(0)
+        except Exception:
+            self.handleError(record)
+
+# Setup Logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+root_logger = logging.getLogger()
+memory_handler = MemoryLogHandler()
+memory_handler.setFormatter(logging.Formatter('%(message)s')) # Send just the message to UI
+root_logger.addHandler(memory_handler)
+logger = logging.getLogger("API")
+
+# GLOBAL INSTANCE (The Single Source of Truth)
+# This instance is used by both the API and the background loop
+ai_core = RedlineAICore(mode="PAPER", timeframe="1h")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # STARTUP
+    logger.info("🚀 SYSTEM STARTUP INITIATED")
+    Database.initialize()
+    
+    # Start the background loop thread
+    loop_task = asyncio.create_task(start_background_loop(ai_core))
+    
+    yield
+    
+    # SHUTDOWN
+    logger.info("🛑 SHUTDOWN SIGNAL RECEIVED")
+    ai_core.stop()
+
+app = FastAPI(lifespan=lifespan)
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "*"], # Allow * for n8n locally
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# GLOBAL AI CONFIGURATION (Managed Persistence)
-AI_CONFIG = AIConfigManager.load_config()
-
-ai_core = RedlineAICore(mode="PAPER", timeframe="1h")
-orchestrator = Orchestrator(mode="PAPER", ai_core=ai_core)
-
-# =====================================================
-# BACKGROUND TASK
-# =====================================================
-async def trading_background_loop():
-    """
-    Infinite loop running in background. Continuously monitors and executes trading cycles.
-    """
-    import logging
-    logger = logging.getLogger("TRADING_LOOP")
-    
-    print(" STARTING BACKGROUND TRADING LOOP...")
-    print(f" Info: Initial orchestrator.is_running: {orchestrator.is_running}")
-    logger.info(" Background Trading Loop Started")
-    
-    heartbeat_counter = 0
-    
-    while True:  # Loop runs forever
-        try:
-            # HEARTBEAT EVERY 10 SECONDS
-            heartbeat_counter += 1
-            current_time = datetime.now().strftime('%H:%M:%S')
-            
-            logger.info(f" AI LOOP ALIVE | Heartbeat #{heartbeat_counter} | Time: {current_time} | Status: {'ONLINE' if orchestrator.is_running else 'STANDBY'}")
-            print(f"\n[LOOP HEARTBEAT #{heartbeat_counter}] Time: {current_time}")
-            print(f"   AI Status: {'ONLINE' if orchestrator.is_running else 'STANDBY'}")
-            print(f"   orchestrator.is_running = {orchestrator.is_running}")
-            print(f"   About to call orchestrator.run_cycle()...")
-            
-            # Call async run_cycle which checks is_running internally
-            await orchestrator.run_cycle()
-            
-            logger.info(f" Cycle completed. Waiting 10 seconds...")
-            print(f"   Cycle completed successfully.\n")
-            
-        except Exception as e:
-            logger.error(f" ORCHESTRATOR ERROR: {e}")
-            print(f"  ORCHESTRATOR ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        await asyncio.sleep(10)  # HEARTBEAT EVERY 10 SECONDS
-
-@app.on_event("startup")
-async def startup_event():
-    asyncio.create_task(trading_background_loop())
-    asyncio.create_task(binance_ws_loop())
-    asyncio.create_task(whale_poller_loop())
-
-async def whale_poller_loop():
-    """
-    Background Task: Scan tracked whales for new on-chain activity.
-    """
-    print(" WHALE POLLER STARTED")
-    while True:
-        try:
-            # Run blocking I/O in thread pool to not block asyncio
-            await asyncio.to_thread(ai_core.whale_watcher.scan_chain_activity)
-        except Exception as e:
-            print(f" Poll Error: {e}")
-            
-        await asyncio.sleep(60) # Chech every 60s
-
-async def binance_ws_loop():
-    """
-    Subscribes to !miniTicker@arr via WebSocket to feed the Scalper Engine.
-    """
-    """
-    Subscribes to !miniTicker@arr via WebSocket to feed the Scalper Engine.
-    """
-    import json
-    import websockets
-    
-    uri = "wss://stream.binance.com:9443/ws/!miniTicker@arr"
-    print(" CONNECTING TO BINANCE WEBSOCKET...")
-    
-    while True:
-        try:
-            async with websockets.connect(uri) as ws:
-                print(" WS CONNECTED (Real-Time Data)")
-                while True:
-                    msg = await ws.recv()
-                    data = json.loads(msg)
-                    
-                    # Filtrujemy tylko nasze monety, żeby nie zalać Orchestratora
-                    for ticker in data:
-                        sym = ticker['s']
-                        if sym.endswith("USDT") and orchestrator.is_running:
-                             # Wywołujemy event w Orchestratorze (Level 5)
-                            tick_payload = {
-                                'symbol': sym, # e.g. BTCUSDT (Binance format) -> trzeba skonwertować na BTC/USDT?
-                                'price': float(ticker['c']),
-                                'vol': float(ticker['v'])
-                            }
-                            # Konwersja formatu symbolu
-                            std_sym = sym.replace("USDT", "/USDT")
-                            tick_payload['symbol'] = std_sym
-                            
-                            orchestrator.on_tick(tick_payload)
-                            
-        except Exception as e:
-            print(f" WS DISCONNECTED: {e}. Reconnecting in 5s...")
-            await asyncio.sleep(5)
-
-# =====================================================
-# DTO MODELS
-# =====================================================
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-class RegisterRequest(BaseModel):
-    fullName: str
-    phone: str
-    email: str
-    about: str
-
-class UserActionRequest(BaseModel):
-    username: str
-    role: str = "USER"
-
-# Zaktualizowany model: teraz przyjmuje klucze API
-class UserUpdateRequest(BaseModel):
-    username: str
-    trading_enabled: bool
-    risk_limit: float
-    notes: str
-    api_key: str = None     # Opcjonalne
-    api_secret: str = None  # Opcjonalne
-
-class AISettingsRequest(BaseModel):
-    min_confidence: float
-    volatility_filter: bool
-    risk_mode: str = "BALANCED"
-    sentiment_weight: float = 50.0
-    max_open_positions: int = 3
-    auto_trade_enabled: bool = False
-    confirmation_required: bool = True
-    news_impact_enabled: bool = True
-    explainability: bool = True # Legacy support
-
-class N8nWebhookRequest(BaseModel):
-    source: str = "n8n"
-    type: str = "sentiment" # sentiment, news, alert
-    value: float = 50.0
-    summary: str = ""
-
-class OrderRequest(BaseModel):
-    symbol: str
-    side: str
-    amount: float
-
-# =====================================================
-# ENDPOINTS
-# =====================================================
-
-# --- WEBSOCKETS ---
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: dict):
-        for connection in self.active_connections:
-            try:
-                await connection.send_json(message)
-            except:
-                pass
-
-manager = ConnectionManager()
-
-@app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str):
-    await manager.connect(websocket)
-    try:
-        while True:
-            # Keep connection alive
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-
-# Inject manager into orchestrator so it can emit events
-orchestrator.ws_manager = manager
-
-
-@app.get("/api/status")
-def system_status():
-    return {
-        "status": "ONLINE",
-        "engine": "REDLINE_AI_CORE_GEN2.5",
-        "feed": "LIVE" if FEED_AVAILABLE else "MOCK",
-        "ai_config": AI_CONFIG
-    }
-
-# --- AUTH ---
-@app.post("/api/auth/login")
-def login(req: LoginRequest):
-    role = UserManager.verify_login(req.username, req.password)
-    if not role: raise HTTPException(401, "Invalid credentials")
-    return {"user": req.username, "role": role, "token": "mock-jwt"}
-
-@app.post("/api/auth/register")
-def register(req: RegisterRequest):
-    contact = f"{req.fullName} | {req.phone} | {req.about}"
-    success, msg = UserManager.request_account(req.email, "PENDING_APPROVAL", contact)
-    if not success: raise HTTPException(400, msg)
-    return {"status": "SUBMITTED"}
-
-# --- ADMIN: USERS ---
-@app.get("/api/admin/users")
-def get_users():
-    db = UserManager.load_db()
-    # Maskujemy klucze API przed wysłaniem do frontendu dla bezpieczeństwa
-    active_users = {}
-    for u, data in db.get('active', {}).items():
-        clean_data = {k: v for k, v in data.items() if k != 'hash'}
-        ex_config = clean_data.get('exchange_config', {})
-
-        # Flaga dla frontendu, czy klucze są ustawione
-        clean_data['has_api_key'] = bool(ex_config.get('api_key'))
-        clean_data['exchange_name'] = ex_config.get('exchange', 'NONE')
-
-        # Usuwamy surowe klucze z odpowiedzi
-        if 'exchange_config' in clean_data:
-            del clean_data['exchange_config']
-        active_users[u] = clean_data
-
-    clean_pending = {u: {k: v for k, v in data.items() if k != 'hash'} for u, data in db.get('pending', {}).items()}
-    return {"active": active_users, "pending": clean_pending}
-
-@app.post("/api/admin/approve")
-def approve_user(req: UserActionRequest):
-    if UserManager.approve_user(req.username, req.role): return {"status": "APPROVED"}
-    raise HTTPException(400, "User not found")
-
-@app.post("/api/admin/reject")
-def reject_user(req: UserActionRequest):
-    if UserManager.reject_user(req.username): return {"status": "REJECTED"}
-    raise HTTPException(400, "User not found")
-
-@app.post("/api/admin/update_user")
-def update_user(req: UserUpdateRequest):
-    """
-    Admin ustawia ryzyko oraz KLUCZE API użytkownika.
-    """
-    updates = {
-        "trading_enabled": req.trading_enabled,
-        "risk_limit": req.risk_limit,
-        "notes": req.notes
-    }
-    # Dodajemy klucze tylko jeśli zostały wpisane (nie są puste)
-    if req.api_key and req.api_secret:
-        updates["api_key"] = req.api_key
-        updates["api_secret"] = req.api_secret
-
-    if UserManager.update_user_settings(req.username, updates):
-        return {"status": "UPDATED"}
-
-    raise HTTPException(400, "Update failed")
-
-# --- ADMIN: AI GOVERNANCE ---
-@app.get("/api/admin/ai_settings")
-def get_ai_settings():
-    global AI_CONFIG
-    AI_CONFIG = AIConfigManager.load_config() # Reload from disk
-    return AI_CONFIG
-
-@app.post("/api/admin/ai_settings")
-def update_ai_settings(req: AISettingsRequest):
-    global AI_CONFIG
-    updates = req.dict()
-    AI_CONFIG = AIConfigManager.update_config(updates)
-    return {"status": "UPDATED", "config": AI_CONFIG}
-
-
-# --- WEBHOOKS: INTERNAL (Autonomous Node) ---
-class InternalWebhookRequest(BaseModel):
-    type: str  # e.g. "SCAN_COMPLETE", "SYSTEM_EVENT"
-    payload: dict  # The actual data
-
-class TradingViewAlert(BaseModel):
-    passphrase: str
-    ticker: str      # e.g., "BTCUSDT"
-    action: str      # "BUY", "SELL", "CLOSE"
-    price: float
-    confidence: int = 100
-
-@app.post("/api/webhook/internal")
-async def internal_webhook(req: InternalWebhookRequest):
-    """
-    Internal endpoint for Autonomous Node to push updates to Frontend via WebSockets.
-    """
-    await manager.broadcast({
-        "type": req.type,
-        "payload": req.payload,
-        "timestamp": datetime.now().isoformat()
-    })
-    return {"status": "BROADCASTED"}
-
-@app.post("/api/webhook/tradingview")
-async def tradingview_webhook(alert: TradingViewAlert):
-    """
-    Secure Webhook for TradingView Alerts.
-    """
-    if alert.passphrase != "REDLINE_SECURE_KEY":
-        raise HTTPException(status_code=401, detail="Invalid Security Passphrase")
-    
-    # Log the signal
-    print(f"📈 [TRADINGVIEW] Signal: {alert.action} {alert.ticker} @ {alert.price} (Conf: {alert.confidence}%)")
-    
-    # Broadcast to Frontend
-    await manager.broadcast({
-        "type": "EXTERNAL_SIGNAL",
-        "payload": {
-            "source": "TradingView",
-            "ticker": alert.ticker,
-            "action": alert.action,
-            "price": alert.price,
-            "confidence": alert.confidence
-        },
-        "timestamp": datetime.now().isoformat()
-    })
-
-    # Forward to Orchestrator (if running)
-    if orchestrator.is_running:
-         orchestrator.on_tick({
-             'symbol': alert.ticker.replace("USDT", "/USDT"),
-             'price': alert.price,
-             'vol': 0 # External signal doesn't imply volume
-         })
-    
-    return {"status": "received", "signal": f"{alert.action} {alert.ticker}"}
-
-# --- WEBHOOKS: n8n / EXTERNAL ---
-@app.post("/api/webhooks/external_data")
-def external_data_webhook(req: N8nWebhookRequest):
-    """
-    Endpoint for n8n to push sentiment or news analysis.
-    """
-    print(f"📡 [WEBHOOK] Received from {req.source}: {req.summary} (Val: {req.value})")
-    
-    # Update AI Core Context
-    ai_core.update_external_context({
-        "sentiment": req.value,
-        "summary": req.summary
-    })
-    
-    return {"status": "ACCEPTED", "context_updated": True}
-
-
-# --- USER SETTINGS ---
-class ConnectExchangeRequest(BaseModel):
-    username: str
-    exchange: str
-    api_key: str
-    api_secret: str
-
-@app.post("/api/admin/reset_system")
-def reset_system():
-    """
-    Hard reset for testing: Balance -> 1000, History -> Clear.
-    """
-    conn = UserManager.load_db_connection()
-    try:
-        conn.execute("UPDATE wallet SET balance = 1000.0 WHERE id = 1")
-        conn.execute("DELETE FROM trade_history")
-        conn.execute("DELETE FROM assets")
-        conn.commit()
-        return {"status": "RESET_COMPLETE", "balance": 1000.0}
-    except Exception as e:
-        raise HTTPException(500, f"Reset Failed: {e}")
-    finally:
-        conn.close()
-
-@app.post("/api/user/connect_exchange")
-def connect_exchange(req: ConnectExchangeRequest):
-    """
-    Allow user to connect their exchange API keys.
-    """
-    # In a real app, verifying the username matches the token is crucial.
-    # For this prototype, we trust the username matches the session.
-    updates = {
-        "exchange_config": {
-            "exchange": req.exchange,
-            "api_key": req.api_key,
-            "api_secret": req.api_secret # Should be encrypted
-        }
-    }
-    # We use the UserManager to save this to the JSON db
-    db = UserManager.load_db()
-    if req.username in db.get('active', {}):
-        # Merge update
-        user_data = db['active'][req.username]
-        user_data['exchange_config'] = updates['exchange_config']
-        UserManager.save_db(db)
-        return {"status": "CONNECTED", "msg": f"Successfully connected to {req.exchange}"}
-    
-    raise HTTPException(404, "User not found")
-
-# --- SCANNER ---
-@app.post("/api/scanner/run_cycle")
-async def run_cycle_manual():
-    """Manually triggers a full orchestrator cycle."""
-    try:
-        # Run the full god-mode mission demo
-        await orchestrator.run_demonstration_mission()
-        return {"status": "CYCLE_COMPLETED", "timestamp": datetime.now()}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(500, f"Orchestrator Error: {e}")
-
-@app.get("/api/scanner/run")
-def run_scanner():
-    """
-    Runs the REAL Orchestrator Scanner (Parallel Multi-Asset).
-    Uses the persistent AI CONFIG.
-    """
-    if not FEED_AVAILABLE:
-        return [{"symbol": "MOCK/BTC", "signal": "FEED ERROR", "price": 0, "rsi": 0, "confidence": 0, "reason": "No data feed"}]
-
-    # Refresh config before running
-    current_config = AIConfigManager.load_config()
-    
-    # Run the real scanner logic
-    # This uses ai_core.evaluate() which now respects external_context and config
-    try:
-        results = orchestrator.scanner.run(current_config)
-        return results if results else []
-    except Exception as e:
-        print(f"Scanner Logic Error: {e}")
-        # Fallback to empty if scan crashes
-        return []
-
-# --- DATA ENDPOINTS ---
-@app.get("/api/wallet")
-def wallet(): return WalletManager.get_wallet_data()
-
-@app.get("/api/wallet/state")
-def wallet_state():
-    """Returns the detailed wallet state for the Frontend."""
-    data = WalletManager.get_wallet_data()
-    return {
-        "total_balance": data.get("balance", 0.0),
-        "pnl_percent": 0.0, # Placeholder
-        "assets": data.get("assets", []),
-        "recent_transactions": data.get("history", [])
-    }
-
-@app.get("/api/trading/assets")
-def wallet_assets(): return WalletManager.get_wallet_data().get("assets", [])
-
-@app.get("/api/trading/positions")
-def get_positions(): return []
-
-@app.post("/api/trading/order")
-def execute_order(order: dict): return {"status": "FILLED", "order_id": "MOCK-123"}
-
-@app.get("/api/ml/status")
-def ml_status(): return {"model_version": "2.5.0", "accuracy": 0.82, "loss": 0.28}
-
-@app.get("/api/ml/chart")
-def ml_chart(): return [{"epoch": i, "loss": 1.0/(i+1), "accuracy": 0.5 + (i/200)} for i in range(1, 50)]
-
-@app.get("/api/ai/state")
-def ai_state():
-    state = ai_core.get_state()
-    state["orchestrator_running"] = orchestrator.is_running
-    return state
+# --- API ENDPOINTS ---
 
 @app.post("/api/ai/toggle")
 async def toggle_ai(active: bool):
     """
-    Switches the AI Core AUTOPILOT on or off.
+    CRITICAL: This controls the Orchestrator which the loop listens to.
     """
-    print(f"[API] Toggling AI Core: {active}")
-    orchestrator.set_autopilot(active)
-    # If activating, ensure the loop is running (it might have exited if it was previously off)
     if active:
-        # Trigger an immediate cycle so user sees action right away
-        asyncio.create_task(orchestrator.run_demonstration_mission())
-    return {"status": "UPDATED", "active": orchestrator.is_running}
+        logger.info("🔌 API COMMAND: ACTIVATE SYSTEM")
+        ai_core.start() # Sets orchestrator.is_running = True
+        return {"status": "success", "message": "SYSTEM ONLINE", "active": True}
+    else:
+        logger.info("🔌 API COMMAND: SHUTDOWN SYSTEM")
+        ai_core.stop() # Sets orchestrator.is_running = False
+        return {"status": "success", "message": "SYSTEM OFFLINE", "active": False}
+
+@app.get("/api/ai/state")
+async def get_ai_state():
+    # Returns the TRUE state of the orchestrator
+    is_running = False
+    if hasattr(ai_core, 'orchestrator'):
+        is_running = ai_core.orchestrator.is_running
+        
+    return {
+        "running": is_running,
+        "mode": ai_core.state["mode"],
+        "engine": "GEN-4 (Connected)"
+    }
 
 @app.get("/api/system/logs")
-def system_logs():
-    """Returns the latest 50 system logs for the HUD."""
-    return get_latest_logs(50)
-
-@app.websocket("/ws/hud")
-async def hud_ws(ws: WebSocket):
-    await ws.accept()
-    try:
-        while True:
-            # W przyszłości tu będziemy pytać Binance o prawdziwe saldo API Key
-            wallet_data = WalletManager.get_wallet_data()
-            payload = {
-                "time": datetime.now().strftime("%H:%M:%S"),
-                "cpu": psutil.cpu_percent(),
-                "mem": psutil.virtual_memory().percent,
-                "funds": wallet_data.get("balance", 0.0), # To będzie balance z Binance
-                "ai_mode": "GEN-3 ACTIVE",
-                "ai_running": ai_core.state["running"],
-                "ext_context": ai_core.external_context.get("summary", "")[:20] + "..." # Small info on HUD
-            }
-
-            await ws.send_json(payload)
-            await asyncio.sleep(1)
-    except WebSocketDisconnect: pass
-
-# =====================================================
-# WHALE WATCHER API
-# =====================================================
-
-class WhaleAddRequest(BaseModel):
-    address: str
-    label: str
-    network: str = "ETH"
-
-class WhaleSignalRequest(BaseModel):
-    symbol: str
-    side: str
-    whale_address: str
-
-@app.get("/api/whales")
-def get_whales():
-    """List all watched whales."""
-    return ai_core.whale_watcher.get_whales()
-
-@app.post("/api/whales")
-def add_whale(req: WhaleAddRequest):
-    """Add a new whale to watch."""
-    success, msg = ai_core.whale_watcher.add_whale(req.address, req.label, req.network)
-    if not success:
-        raise HTTPException(400, msg)
-    return {"status": "ADDED", "msg": msg}
-
-@app.delete("/api/whales/{address}")
-def remove_whale(address: str):
-    """Remove a whale."""
-    if ai_core.whale_watcher.remove_whale(address):
-        return {"status": "REMOVED"}
-    raise HTTPException(404, "Whale not found")
-
-@app.post("/api/whales/inject_signal")
-def inject_whale_signal(req: WhaleSignalRequest):
-    """
-    Simulation Endpoint: Force specific whale to signal a move.
-    """
-    ai_core.whale_watcher.inject_signal(req.symbol, req.side, req.whale_address)
-    return {"status": "INJECTED", "msg": f"Whale {req.whale_address} signalled {req.side} on {req.symbol}"}
+async def get_logs():
+    # Return the actual captured logs from the buffer
+    return LOG_BUFFER
