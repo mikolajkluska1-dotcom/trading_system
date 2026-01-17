@@ -264,15 +264,32 @@ class Orchestrator:
             logger.info(f"MISSION COMPLETE. NET PROFIT: +${profit:.2f}")
             log_event(f"MISSION COMPLETE. NET PROFIT: +${profit:.2f}", "SUCCESS")
             
-            # --- GOOGLE SHEETS LOGGING (LIVE) ---
+            # --- GOOGLE SHEETS LOGGING (CUSTOM SCHEMA) ---
             try:
-                self.reporter.log_trade(
-                    symbol=symbol,
-                    action="SELL", # We are logging the full cycle profit here
-                    price=exit_price,
-                    amount=trade_qty,
-                    profit=profit
-                )
+                # Anti-Spam Logic: Log only if LIVE or significant PAPER profit
+                should_log = (self.mode == "LIVE") or (self.mode == "PAPER" and profit > 0.50)
+                
+                if should_log:
+                    # Extract AI Metadata
+                    ai_score = best_pick.get('score', 0)
+                    ai_conf = best_pick.get('confidence', 0.0)
+                    ai_reasons = ", ".join(best_pick.get('reasons', [])) or "Market Pattern"
+
+                    # Log to Sheets using new signature
+                    self.reporter.log_trade(
+                        symbol=symbol,
+                        action="SELL",      # We record the close of the cycle
+                        price=exit_price,
+                        amount=trade_qty,
+                        profit_usd=profit,  # PnL in dollars
+                        ai_score=ai_score,
+                        confidence=ai_conf,
+                        reasons=ai_reasons
+                    )
+                    logger.info(f"✅ Logged to Sheets: {symbol} (+$ {profit:.2f})")
+                else:
+                    logger.info(f"Sheets Log Skipped (Profit ${profit:.2f} below threshold)")
+
             except Exception as e:
                 logger.error(f"Google Sheets Log Failed: {e}")
 

@@ -21,3 +21,11 @@ assets/training_report.json
 
 # User data
 assets/users_db.json
+
+__pycache__/
+venv/
+node_modules/
+.env
+.DS_Store
+*.pkl
+*.log
