@@ -57,26 +57,31 @@ const TradingHub = () => {
                     <div className="relative group mb-12">
                         {/* DYNAMIC RING ANIMATION */}
                         <div className={`absolute -inset-4 rounded-full border-2 border-dashed transition-all duration-1000 ${isAiActive
-                                ? 'border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)] animate-[spin_4s_linear_infinite]'
-                                : 'border-red-600/60 shadow-none scale-100'
+                            ? 'border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)] animate-[spin_4s_linear_infinite]'
+                            : 'border-red-600/60 shadow-none scale-100'
                             }`} />
 
                         {/* Inner Glow */}
                         <div className={`absolute inset-0 rounded-full blur-3xl transition-all duration-500 ${isAiActive ? 'bg-green-500/20' : 'bg-red-500/10'
                             }`} />
 
-                        {/* THE AVATAR IMAGE */}
-                        <div className={`relative w-64 h-64 rounded-full overflow-hidden border-4 transition-colors duration-500 shadow-2xl z-10 bg-black ${isAiActive ? 'border-green-500/50' : 'border-red-900'
+                        {/* THE PROCESSOR CORE */}
+                        <div className={`relative w-64 h-64 rounded-full overflow-hidden border-4 transition-colors duration-500 shadow-2xl z-10 bg-black flex items-center justify-center ${isAiActive ? 'border-green-500/50' : 'border-red-900'
                             }`}>
-                            <img
-                                src="/assets/ai_avatar.png"
-                                alt="AI Avatar"
-                                className={`w-full h-full object-cover transition-all duration-700 ${isAiActive
-                                        ? 'scale-110 brightness-110 saturate-120'
-                                        : 'scale-100 grayscale brightness-75 sepia-[.5] hue-rotate-[-50deg]'
+
+                            <Cpu
+                                size={120}
+                                strokeWidth={1}
+                                className={`transition-all duration-700 ${isAiActive
+                                    ? 'text-green-500 drop-shadow-[0_0_15px_rgba(34,197,94,0.8)] animate-pulse'
+                                    : 'text-red-900 opacity-50'
                                     }`}
-                                onError={(e) => { e.target.onerror = null; e.target.src = "https://via.placeholder.com/256/000000/00FF00?text=AI+CORE"; }}
                             />
+
+                            {/* Internal Circuit Animation */}
+                            {isAiActive && (
+                                <div className="absolute inset-0 bg-gradient-to-t from-green-500/20 to-transparent animate-pulse" />
+                            )}
 
                             {/* Scan Line Overlay (Only when Active) */}
                             {isAiActive && (
@@ -108,13 +113,14 @@ const TradingHub = () => {
                         <span className="text-[10px] text-gray-700 font-mono">LIVE FEED PROTOCOL // PORT 8000</span>
                     </div>
 
-                    <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar flex flex-col">
                         {logs.length === 0 ? (
                             <div className="p-4 rounded-xl bg-gray-900/30 border border-dashed border-gray-800 text-gray-600 text-center font-mono text-sm">
                                 {isAiActive ? " Awaiting market signals..." : " System Offline. Initialize Core to begin."}
                             </div>
                         ) : (
-                            logs.slice().reverse().slice(0, 6).map((log, index) => {
+                            // FIXED: Removed .reverse() so newest logs (index 0) appear at the top
+                            logs.slice(0, 6).map((log, index) => {
                                 // --- PARSING LOGIC ---
                                 let style = "border-gray-800 bg-black/40 text-gray-500";
                                 let icon = "";

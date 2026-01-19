@@ -8,9 +8,17 @@ import logging
 import hashlib
 from datetime import datetime
 
-# ML Imports
-from ml.brain import DeepBrain
-from ml.whale_watcher import WhaleWatcher
+# ML Imports (zakładamy, że te pliki istnieją, jeśli nie - system może zgłosić błąd importu)
+# Jeśli nie używasz jeszcze ML, te importy mogą wymagać "zaślepienia"
+try:
+    from ml.brain import DeepBrain
+    from ml.whale_watcher import WhaleWatcher
+except ImportError:
+    # Fallback dla trybu testowego bez pełnego ML
+    class DeepBrain:
+        def predict(self, df): return 0, 0, "NEUTRAL"
+    class WhaleWatcher:
+        def check_for_signals(self, s): return None
 
 # Logging setup
 logging.basicConfig(
@@ -101,16 +109,26 @@ class RedlineAICore:
             "summary": "No external data yet."
         }
 
+        # --- SHORT TERM MEMORY (n8n Integration) ---
+        self.market_sentiment = 0.0
+        self.whale_pressure = 0.0
+
         # Dwa półkule mózgu
         self.logic_brain = DecisionEngine()
         self.neural_brain = DeepBrain() # ML V7
         self.whale_watcher = WhaleWatcher() # Copy Trading Module
 
         # --- ORCHESTRATOR OWNERSHIP (Unified Architecture) ---
-        # Local import to prevent circular dependency:
-        # Orchestrator -> MarketScanner -> RedlineAICore
-        from core.orchestrator import Orchestrator
-        self.orchestrator = Orchestrator(mode=mode, ai_core=self)
+        # Local import to prevent circular dependency
+        try:
+            from core.orchestrator import Orchestrator
+            self.orchestrator = Orchestrator(mode=mode, ai_core=self)
+        except ImportError:
+            logger.warning("Orchestrator not found, running in standalone mode.")
+            class MockOrch: 
+                is_running=False
+                def set_autopilot(self, x): pass
+            self.orchestrator = MockOrch()
 
         logger.info(f"AI CORE INITIALIZED: {self.state}")
 
@@ -118,7 +136,6 @@ class RedlineAICore:
         """Activates the Orchestrator loop."""
         if not self.orchestrator.is_running:
             self.orchestrator.is_running = True
-            # Also set the legacy Orchestrator autopilot if needed
             self.orchestrator.set_autopilot(True) 
             logger.info("🟢 AI SYSTEM STARTED (Orchestrator Online)")
 
@@ -130,22 +147,81 @@ class RedlineAICore:
             logger.info("🔴 AI SYSTEM STOPPED (Orchestrator Offline)")
 
     def get_state(self):
-        # Dołączamy external context do stanu
         full_state = self.state.copy()
         full_state["external_context"] = self.external_context
+        full_state["short_term_memory"] = {
+            "market_sentiment": self.market_sentiment,
+            "whale_pressure": self.whale_pressure
+        }
         return full_state
 
+    def process_webhook_data(self, data: dict):
+        """
+        Updates Short Term Memory based on n8n webhooks.
+        Fixed to be robust against None/Null values.
+        """
+        try:
+            source = data.get("source", "unknown")
+            logger.info(f"📦 RAW PACKET RECEIVED: {data}")
+
+            # Wyciągamy payload (czasem jest w 'data', czasem płasko)
+            payload = data.get("data", data)
+            if not payload: 
+                payload = data # Fallback
+
+            # 1. News / Sentiment
+            if source in ["news", "sentiment", "n8n-news-agent"]:
+                # Szukamy wartości pod różnymi kluczami
+                val = payload.get("sentiment")
+                if val is None: val = payload.get("value")
+                if val is None: val = payload.get("sentiment_score")
+
+                if val is not None:
+                    try:
+                        self.market_sentiment = float(val)
+                    except (ValueError, TypeError):
+                        pass # Ignorujemy błędy parsowania
+
+            # 2. Whale Watcher
+            elif source == "whale_watcher":
+                msg_type = payload.get("type", "UNKNOWN")
+                
+                # Bezpieczne pobranie wartości (zamiana None na 0)
+                raw_val = payload.get("value")
+                if raw_val is None: raw_val = 0
+                
+                try:
+                    usd_value = float(raw_val)
+                except (ValueError, TypeError):
+                    usd_value = 0.0
+                
+                # Impact Logic: Every $100k = 1 point
+                impact = usd_value / 100000.0
+                
+                if "BUY" in msg_type or "GREEN" in msg_type:
+                    self.whale_pressure += impact
+                elif "SELL" in msg_type or "RED" in msg_type:
+                    self.whale_pressure -= impact
+                
+                # Clamp between -100 and 100
+                self.whale_pressure = max(-100.0, min(100.0, self.whale_pressure))
+
+            logger.info(f"🧠 MEMORY UPDATED | Sentiment: {self.market_sentiment:.1f} | Whale Pressure: {self.whale_pressure:.1f}")
+
+        except Exception as e:
+            logger.error(f"⚠️ Webhook Processing Error: {e}")
+
     def update_external_context(self, data):
-        """
-        Metoda dla Webhooka (n8n)
-        Oczekuje: {"sentiment": float, "summary": str}
-        """
+        """Legacy wrapper"""
         if "sentiment" in data:
+            data["source"] = "sentiment"
+            self.process_webhook_data(data)
             self.external_context["sentiment"] = float(data["sentiment"])
+        
         if "summary" in data:
             self.external_context["summary"] = data["summary"]
+            
         self.external_context["last_update"] = datetime.utcnow().isoformat()
-        logger.info(f"🧠 EXT CONTEXT UPDATED: {self.external_context}")
 
     def set_mode(self, mode):
         self.state["mode"] = mode.upper()
@@ -157,73 +233,39 @@ class RedlineAICore:
     def evaluate(self, symbol, market_data, df, config):
         """
         Główna metoda decyzyjna.
-        Wymaga: market_data (dict) ORAZ df (DataFrame dla ML) ORAZ config (dict)
         """
-        # 1. Lewa półkula: Logika (Reguły)
+        # 1. Logika
         l_score, l_conf, l_reasons, l_flags = self.logic_brain.analyze(symbol, market_data)
 
-        # 2. Prawa półkula: Intuicja (DeepBrain ML)
-        ml_pred, ml_conf, ml_sig = self.neural_brain.predict(df)
+        # 2. ML (Zabezpieczenie przed brakiem danych)
+        if df is not None and not df.empty:
+            ml_pred, ml_conf, ml_sig = self.neural_brain.predict(df)
+        else:
+            ml_pred, ml_conf, ml_sig = 0, 0, "NEUTRAL"
 
-        # 3. Trzecie Oko: External Context (Sentiment / n8n)
-        ext_sentiment = self.external_context["sentiment"]
-        sent_weight = config.get("sentiment_weight", 50.0) / 100.0 # Normalizacja 0-1
+        # 3. Fuzja Danych
+        final_score = l_score 
         
-        # Wpływ sentymentu na wynik podstawowy
-        sentiment_delta = (ext_sentiment - 50.0) * sent_weight 
-        # Np. sentiment 80 (bullish), waga 1.0 -> +30 pkt do score
+        # Add Memory Factors
+        final_score += self.market_sentiment
+        final_score += self.whale_pressure
         
-        # 4. Fuzja Danych (Hybrid Consensus)
-        final_score = l_score + sentiment_delta
+        if abs(self.market_sentiment) > 1:
+            l_reasons.append(f"Sentiment Impact ({self.market_sentiment:+.1f})")
+        
+        if abs(self.whale_pressure) > 1:
+            l_reasons.append(f"Whale Pressure ({self.whale_pressure:+.1f})")
+            
         final_conf = l_conf
         
-        if abs(sentiment_delta) > 5:
-            l_reasons.append(f"Market Sentiment Impact ({sentiment_delta:+.1f})")
-
-        # --- WHALE COPY TRADING INTEGRATION ---
-        if config.get("copy_trading_enabled", False):
-            whale_sig = self.whale_watcher.check_for_signals(symbol)
-            if whale_sig:
-                # Calculate Impact
-                trust = whale_sig['trust_score'] / 100.0
-                factor = config.get("whale_trust_factor", 0.5)
-                
-                # Signal Matching
-                if whale_sig['side'] == "BUY":
-                     # Boost Score
-                     boost = 25.0 * trust * factor
-                     final_score += boost
-                     l_reasons.append(f"🐋 WHALE BUY: {whale_sig['whale']} (+{boost:.1f})")
-                     
-                     # Force Confidence if trust is high
-                     if trust > 0.8:
-                         final_conf = max(final_conf, 0.75)
-                         l_reasons.append("Whale Confidence Boost")
-
-                elif whale_sig['side'] == "SELL":
-                     penalty = 25.0 * trust * factor
-                     final_score -= penalty
-                     l_reasons.append(f"🐋 WHALE SELL: {whale_sig['whale']} (-{penalty:.1f})")
-
-        # ML Impact - Jeśli ML jest pewne (>0.6), wpływa na wynik
+        # 4. Copy Trading / ML Impact (Uproszczone)
         if ml_conf > 0.6:
             if ml_sig == "BUY":
                 final_score += 15
-                l_reasons.append(f"ML Confirms BUY (Conf {ml_conf:.2f})")
+                l_reasons.append(f"ML Confirms BUY ({ml_conf:.2f})")
             elif ml_sig == "SELL":
                 final_score -= 15
-                l_reasons.append(f"ML Confirms SELL (Conf {ml_conf:.2f})")
-
-            # Boost pewności jeśli logika i ML się zgadzają
-            if (l_score > 60 and ml_sig == "BUY") or (l_score < 40 and ml_sig == "SELL"):
-                final_conf = min(1.0, final_conf + 0.15)
-                l_reasons.append("HYBRID CONFLUENCE") # Najsilniejszy sygnał
-
-        # OOD Protection
-        if "OOD" in ml_sig:
-            final_conf = 0.0
-            l_reasons.append(f"ML Veto: {ml_sig}")
-            l_flags.append("AI_OOD_EVENT")
+                l_reasons.append(f"ML Confirms SELL ({ml_conf:.2f})")
 
         # 5. Finalna Klasyfikacja
         final_score = max(0, min(100, final_score))
@@ -242,7 +284,7 @@ class RedlineAICore:
         decision_id = self._generate_id(symbol, final_score, action)
 
         if "STRONG" in action:
-            logger.info(f"🧠 HYBRID SIGNAL: {symbol} {action} (Score: {final_score:.0f}, ML Conf: {ml_conf:.2f})")
+            logger.info(f"🧠 HYBRID SIGNAL: {symbol} {action} (Score: {final_score:.0f})")
 
         return TradeSignal(
             symbol,
@@ -252,5 +294,5 @@ class RedlineAICore:
             l_reasons,
             l_flags,
             decision_id,
-            ml_data={"pred": ml_pred, "conf": ml_conf, "sig": ml_sig}
+            ml_data={"sig": ml_sig, "whale_pressure": self.whale_pressure}
         )

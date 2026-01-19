@@ -1,41 +1,84 @@
 version: '3.8'
 
 services:
-  # --- SERCE SYSTEMU (BACKEND) ---
+  # --- TRADING BOT BACKEND ---
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
     container_name: redline_backend
-    volumes:
-      - .:/app  # Hot-reloading: zmiany w kodzie na dysku od razu widać w kontenerze
     ports:
       - "8000:8000"
+    volumes:
+      - .:/app
+      - ./assets:/app/assets
+    # FORCE BIND TO 0.0.0.0 so n8n can see it
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       - PYTHONUNBUFFERED=1
-      # Tu w przyszłości wpadną klucze z Vaulta
-      # - BINANCE_API_KEY=... 
-    networks:
-      - trading_net
+      - N8N_WEBHOOK_URL=http://redline_n8n:5678/webhook/
+      # Dodajemy namiary na bazę danych, żeby Python wiedział gdzie uderzać
+      - DB_HOST=timescaledb
+      - DB_NAME=redline_db
+      - DB_USER=redline_user
+      - DB_PASS=redline_pass
+    restart: always
+    depends_on:
+      - timescaledb
 
-  # --- KOKPIT (FRONTEND) ---
+  # --- REACT FRONTEND ---
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
     container_name: redline_frontend
-    volumes:
-      - ./frontend/src:/app/src  # Hot-reloading frontendu
     ports:
-      - "5173:5173"
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     environment:
       - VITE_API_URL=http://localhost:8000
-    depends_on:
-      - backend
-    networks:
-      - trading_net
+    restart: always
 
-# Sieć wewnętrzna, żeby kontenery widziały się po nazwach
-networks:
-  trading_net:
-    driver: bridge
+  # --- FREE SELF-HOSTED N8N ---
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: redline_n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=redline_password
+      - WEBHOOK_URL=http://localhost:5678/
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=timescaledb
+      - DB_POSTGRESDB_USER=redline_user
+      - DB_POSTGRESDB_PASSWORD=redline_pass
+      - DB_POSTGRESDB_DATABASE=redline_db
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: always
+    depends_on:
+      - timescaledb
+
+  # --- DATABASE (TIMESCALE DB / POSTGRES) ---
+  # TO JEST NOWA SEKCJA, KTÓRĄ DODAJEMY
+  timescaledb:
+    image: timescale/timescaledb:latest-pg14
+    # ... inne linie bez zmian ...
+    ports:
+      - "5435:5432" #ZMIANA TUTAJ (Lewa strona to port Windowsa)
+    # ... reszta bez zmian ...
+    environment:
+      - POSTGRES_USER=redline_user
+      - POSTGRES_PASSWORD=redline_pass
+      - POSTGRES_DB=redline_db
+    volumes:
+      # TUTAJ JEST TWOJE PRZEKIEROWANIE NA DYSK 1TB
+      - R:/Redline_Data/database:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  n8n_data:

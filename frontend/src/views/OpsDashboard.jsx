@@ -101,7 +101,14 @@ const OpsDashboard = () => {
   const { events } = useEvents();
   const { isAiActive, toggleAiCore, missionSummary } = useMission();
   const [portfolioValue, setPortfolioValue] = useState(10000);
-  const [recentAlerts, setRecentAlerts] = useState([]);
+
+
+  // AI STATE (Live polling)
+  const [aiState, setAiState] = useState({
+    whale_pressure: 0.0,
+    market_sentiment: 0.0,
+    engine: "DISCONNECTED"
+  });
 
   // Portfolio Chart Data (Simplified)
   const [portfolioChart, setPortfolioChart] = useState({
@@ -115,10 +122,41 @@ const OpsDashboard = () => {
     }]
   });
 
-  // Capture alerts from event stream
+  // FORMAT EVENTS FOR DISPLAY
+  // useEvents returns [newest, ..., oldest]
+  const recentAlerts = events.map(e => ({
+    time: e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString(),
+    type: e.type || "INFO",
+    message: e.message || JSON.stringify(e)
+  }));
+
+  // --- LIVE POLLING EFFECT ---
   useEffect(() => {
-    // (Existing logic preserved)
-  }, [events]);
+    const fetchAiState = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/api/ai/state');
+        if (res.ok) {
+          const data = await res.json();
+          // Extract Short Term Memory
+          const memory = data.short_term_memory || {};
+          setAiState({
+            whale_pressure: memory.whale_pressure || 0.0,
+            market_sentiment: memory.market_sentiment || 0.0,
+            engine: data.engine || "GEN-4 (Connected)"
+          });
+        }
+      } catch (err) {
+        console.error("AI Heartbeat Error:", err);
+      }
+    };
+
+    // Initial fetch
+    fetchAiState();
+
+    // Poll every 3 seconds
+    const interval = setInterval(fetchAiState, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="min-h-screen w-full bg-[#030005] text-white p-6 lg:p-12 relative overflow-hidden font-sans">
@@ -160,39 +198,64 @@ const OpsDashboard = () => {
           {/* LEFT COLUMN: SYSTEM STATUS & HEALTH (4 cols) */}
           <div className="lg:col-span-4 space-y-6">
 
-            {/* SYSTEM HEALTH CARD */}
-            <SpotlightCard title="SYSTEM HEALTH" icon={Activity}>
+            {/* LIVE MARKET PULSE (New!) */}
+            <SpotlightCard title="LIVE MARKET PULSE" icon={Activity} className="border-indigo-500/30">
               <div className="space-y-6">
-                {/* CPU */}
+                {/* Status */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-green-500/5 border border-green-500/10">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                  </span>
+                  <span className="text-xs font-bold text-green-400 tracking-wider">SYSTEM ONLINE | SCANNING...</span>
+                </div>
+
+                {/* WHALE PRESSURE */}
                 <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-bold text-gray-400">
-                    <span className="flex items-center gap-2"><Cpu size={14} className="text-purple-500" /> CPU LOAD</span>
-                    <span className="text-white">0%</span>
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-gray-400">WHALE PRESSURE</span>
+                    <span className={aiState.whale_pressure > 0 ? "text-green-400" : "text-red-400"}>
+                      {aiState.whale_pressure > 0 ? "+" : ""}{aiState.whale_pressure.toFixed(1)}
+                    </span>
                   </div>
-                  <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-purple-500 w-[0%] rounded-full shadow-[0_0_10px_#a855f7]"></div>
+                  {/* Bipolar Progress Bar */}
+                  <div className="relative h-2 w-full bg-gray-800 rounded-full overflow-hidden flex">
+                    <div className="w-1/2 h-full border-r border-gray-700/50 flex justify-end">
+                      {/* Negative Bar */}
+                      <div
+                        className="h-full bg-red-500/80 rounded-l-full transition-all duration-500"
+                        style={{ width: aiState.whale_pressure < 0 ? `${Math.min(Math.abs(aiState.whale_pressure), 100)}%` : '0%' }}
+                      ></div>
+                    </div>
+                    <div className="w-1/2 h-full flex justify-start">
+                      {/* Positive Bar */}
+                      <div
+                        className="h-full bg-green-500/80 rounded-r-full transition-all duration-500"
+                        style={{ width: aiState.whale_pressure > 0 ? `${Math.min(aiState.whale_pressure, 100)}%` : '0%' }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
 
-                {/* MEMORY */}
+                {/* MARKET SENTIMENT */}
                 <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-bold text-gray-400">
-                    <span className="flex items-center gap-2"><HardDrive size={14} className="text-indigo-500" /> MEMORY</span>
-                    <span className="text-white">0 GB</span>
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-gray-400">MARKET SENTIMENT</span>
+                    <span className="text-indigo-400">{aiState.market_sentiment.toFixed(1)}</span>
                   </div>
                   <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-indigo-500 w-[0%] rounded-full"></div>
+                    <div
+                      className="h-full bg-indigo-500 w-[0%] rounded-full shadow-[0_0_10px_#6366f1] transition-all duration-1000"
+                      style={{ width: `${Math.min(Math.abs(aiState.market_sentiment), 100)}%` }}
+                    ></div>
                   </div>
                 </div>
 
-                {/* NETWORK */}
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-bold text-gray-400">
-                    <span className="flex items-center gap-2"><Network size={14} className="text-green-500" /> LATENCY</span>
-                    <span className="text-white">0 ms</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-green-500 w-[0%] rounded-full"></div>
+                {/* LAST ACTION */}
+                <div className="pt-2 border-t border-white/5">
+                  <div className="text-[10px] text-gray-500 uppercase">Last Log:</div>
+                  <div className="text-xs text-gray-300 truncate font-mono mt-1">
+                    {recentAlerts.length > 0 ? recentAlerts[0].message : "Waiting for signals..."}
                   </div>
                 </div>
               </div>

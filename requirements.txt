@@ -1,8 +1,36 @@
+# --- Core & Server ---
 fastapi
 uvicorn
+pydantic
+python-multipart
+requests
+python-dotenv
+aiohttp
 psutil
-pandas
+
+# --- Data & Finance ---
 numpy
-ccxt
+pandas
 yfinance
+ccxt
 ta
+gspread
+oauth2client
+
+# --- AI & ML ---
+torch
+scikit-learn
+textblob
+
+# --- Visualization & UI ---
+streamlit
+plotly
+
+# --- Security & Utils ---
+cryptography
+websockets
+
+# --- Database (Dla pewności) ---
+psycopg2-binary
+sqlalchemy
+asyncpg
