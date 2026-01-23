@@ -1,318 +1,105 @@
-import os
-import numpy as np
-import pandas as pd
 import torch
 import torch.nn as nn
-import pickle
-from datetime import datetime
-from torch.utils.data import Dataset, DataLoader
-from sklearn.preprocessing import StandardScaler
-from ta.volatility import AverageTrueRange
-from ta.momentum import RSIIndicator
-from ta.trend import MACD
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+import os
+import logging
 
-# Integracja systemowa
-from .regime import MarketRegime
-from .knowledge import KnowledgeBase
+# Logger - żebyś widział w konsoli co myśli mózg
+logger = logging.getLogger("DEEP_BRAIN_V2")
+logging.basicConfig(level=logging.INFO)
 
-# ================================================================
-# ARCHITECTURE (Monte Carlo Dropout Enabled)
-# ================================================================
+# --- KONFIGURACJA V2 (Musi pasować do treningu) ---
+MODEL_PATH = "R:/REDLINE_SYSTEM/ai_models/btc_lstm_v2.pth"
+SEQ_LENGTH = 60     # Patrzymy 60 minut wstecz
+HIDDEN_SIZE = 100   # ZWIĘKSZONY ROZMIAR
+NUM_LAYERS = 2      # ZWIĘKSZONA GŁĘBOKOŚĆ
 
-class TimeSeriesDataset(Dataset):
-    def __init__(self, X, y):
-        self.X = torch.tensor(X, dtype=torch.float32)
-        self.y = torch.tensor(y, dtype=torch.float32)
-
-    def __len__(self):
-        return len(self.X)
-
-    def __getitem__(self, idx):
-        return self.X[idx], self.y[idx]
-
-class NeuralNet(nn.Module):
-    """
-    DeepBrain V6 Core.
-    Wymuszone Dropout layers dla oceny epistemicznej niepewności (MC Dropout).
-    """
-    def __init__(self, input_dim, hidden_dim=64, num_layers=2, dropout=0.2, arch_type='LSTM'):
-        super(NeuralNet, self).__init__()
-        self.arch_type = arch_type
-
-        if arch_type == 'GRU':
-            self.rnn = nn.GRU(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout)
-        else:
-            self.rnn = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout)
-
-        self.fc = nn.Sequential(
-            nn.Linear(hidden_dim, 32),
-            nn.ReLU(),
-            nn.Dropout(dropout), # Critical for Uncertainty Estimation
-            nn.Linear(32, 1)
-        )
+# --- DEFINICJA SIECI (Bliźniak tej z treningu) ---
+class CryptoLSTM(nn.Module):
+    def __init__(self, input_size=1, hidden_size=100, output_size=1):
+        super(CryptoLSTM, self).__init__()
+        # Dokładnie taka sama struktura jak przy uczeniu
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers=NUM_LAYERS, batch_first=True, dropout=0.2)
+        self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
-        out, _ = self.rnn(x)
-        out = out[:, -1, :] # Last Step Context
-        prediction = self.fc(out)
-        return prediction
-
-# ================================================================
-# DEEP BRAIN ENGINE V6 (Institutional Grade)
-# ================================================================
+        out, _ = self.lstm(x)
+        # Bierzemy tylko ostatni krok czasowy
+        out = self.fc(out[:, -1, :])
+        return out
 
 class DeepBrain:
-    def __init__(self, lookback=60):
-        self.lookback = lookback
-        self.model_path = os.path.join("assets", "redline_brain_v6.pt")
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        # Local Context Scaler (Anti-Leakage)
-        self.scaler = StandardScaler()
+    """
+    Sterownik V2 - Obsługuje model 'Massive Brain' (900k świeczek).
+    """
+    def __init__(self):
+        self.device = torch.device("cpu") # Do odczytu CPU jest wystarczające
         self.model = None
-        self.current_arch = "LSTM"
-        self.is_trained = False
-        self.last_train_loss = 0.0
-        
-        # Inicjalizacja Pamięci (Experience Replay)
-        self.memory = []
-        self.replay_memories("brain_v6")
+        self.scaler = MinMaxScaler(feature_range=(0, 1))
+        self._load_model()
 
-    # ------------------------------------------------------------
-    # MEMORY & EXPERIENCE REPLAY
-    # ------------------------------------------------------------
-    def replay_memories(self, user_id):
-        from core.logger import log_event
-        
-        # 1. Load RL Memory (Pickle)
-        self.load(user_id)
-        if hasattr(self, 'memory') and len(self.memory) > 0:
-             log_event(f"🧠 Brain Restored: {len(self.memory)} memories loaded.", "SUCCESS")
-        
+    def _load_model(self):
+        if not os.path.exists(MODEL_PATH):
+            logger.error(f"❌ [DeepBrain] Brak modelu V2 w: {MODEL_PATH}")
+            return
+
         try:
-            df_mem = KnowledgeBase.load_training_data(user_id)
-            if df_mem.empty:
-                # log_event("🧠 Brain is clean (No patterns found).", "INFO")
-                return
-
-            # Konwersja z JSON do Tensorów
-            # ... (Logic existing) ...
-            
-            count = len(df_mem)
-            # log_event(f"🧠 Experience Replay: Loaded {count} past patterns.", "SUCCESS")
-            
+            self.model = CryptoLSTM(hidden_size=HIDDEN_SIZE)
+            # Ładowanie wag (map_location=cpu chroni przed błędami, gdybyś trenował na GPU)
+            self.model.load_state_dict(torch.load(MODEL_PATH, map_location=self.device))
+            self.model.eval() # Tryb ewaluacji (wyłącza losowość dropoutu)
+            logger.info(f"✅ [DeepBrain] MÓZG V2 ZAŁADOWANY (100 Neuronów / 2 Warstwy)")
         except Exception as e:
-            log_event(f"⚠️ Memory Replay Failed: {e}", "WARN")
+            logger.error(f"❌ [DeepBrain] Błąd ładowania V2: {e}")
+            self.model = None
 
-    def save(self, name):
-        """Persist memory to disk"""
-        try:
-            path = os.path.join("assets", f"{name}_memory.pkl")
-            with open(path, "wb") as f:
-                pickle.dump(self.memory, f)
-        except Exception as e:
-            print(f"Save Failed: {e}")
-
-    def load(self, name):
-        """Load memory from disk"""
-        try:
-            path = os.path.join("assets", f"{name}_memory.pkl")
-            if os.path.exists(path):
-                with open(path, "rb") as f:
-                    self.memory = pickle.load(f)
-        except Exception as e:
-            print(f"Load Failed: {e}")
-
-    def remember(self, state, action, reward, next_state, done):
-        """Store transaction and Auto-Save"""
-        self.memory.append((state, action, reward, next_state, done))
-
-        # --- AUTO-SAVE TRIGGER ---
-        # Save every time we get a significant reward (trade result) OR every 10 steps
-        if done or len(self.memory) % 10 == 0:
-            self.save("brain_v6") 
-
-    # ------------------------------------------------------------
-    # Feature Engineering (Log Returns Target)
-    # ------------------------------------------------------------
-    def _prepare_data(self, df, is_inference=False):
-        if df.empty or len(df) < self.lookback + 5:
-            return None, None
-
-        data = df.copy()
-
-        # 1. Target: Log Returns (Dynamika, nie cena)
-        data['log_ret'] = np.log(data['close'] / data['close'].shift(1))
-
-        # 2. Features (Robust check)
-        if 'atr' not in data:
-            data['atr'] = AverageTrueRange(data['high'], data['low'], data['close'], window=14).average_true_range()
-        if 'rsi' not in data:
-            data['rsi'] = RSIIndicator(data['close'], 14).rsi()
-        if 'macd' not in data:
-            macd = MACD(data['close'])
-            data['macd'] = macd.macd()
-            data['macd_diff'] = macd.macd_diff()
-
-        # 3. New Alpha Features (Rich Context)
-        # Volume Delta Proxy (VDP): Szacowany netto wolumen (Order Flow proxy)
-        range_size = (data['high'] - data['low']).replace(0, 1e-9)
-        data['vdp'] = ((data['close'] - data['low']) - (data['high'] - data['close'])) / range_size * data['volume']
-
-        # Volatility Signature: Zmienność relatywna
-        data['vol_sig'] = data['atr'] / data['close']
-
-        data.dropna(inplace=True)
-        feature_cols = ['log_ret', 'atr', 'rsi', 'macd', 'vdp', 'vol_sig']
-
-        # 3. Scaling (Local Context Protection)
-        try:
-            # Zawsze fitujemy lokalnie, aby uniknąć cross-asset leakage w Skanerze
-            scaled_data = self.scaler.fit_transform(data[feature_cols])
-        except ValueError:
-            return None, None
-
-        X, y = [], []
-        target_col_idx = 0
-
-        for i in range(self.lookback, len(scaled_data)):
-            X.append(scaled_data[i-self.lookback:i])
-            y.append(scaled_data[i, target_col_idx])
-
-        return np.array(X), np.array(y)
-
-    # ------------------------------------------------------------
-    # Training Loop (Online Adaptation)
-    # ------------------------------------------------------------
-    def train_on_fly(self, df, epochs=15):
-        X, y = self._prepare_data(df, is_inference=False)
-        if X is None: return False
-
-        dataset = TimeSeriesDataset(X, y)
-        loader = DataLoader(dataset, batch_size=32, shuffle=True)
-
-        # Auto-Switch Architecture based on Volatility Regime
-        atr_val = df['atr'].iloc[-1] if 'atr' in df else 0
-        self.current_arch = 'GRU' if atr_val > df['close'].iloc[-1] * 0.02 else 'LSTM'
-
-        if self.model is None:
-            input_dim = X.shape[2]
-            self.model = NeuralNet(input_dim, arch_type=self.current_arch).to(self.device)
-
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001, weight_decay=1e-5)
-        criterion = nn.MSELoss()
-
-        self.model.train()
-        losses = []
-        for _ in range(epochs):
-            for batch_X, batch_y in loader:
-                batch_X, batch_y = batch_X.to(self.device), batch_y.to(self.device)
-                optimizer.zero_grad()
-                pred = self.model(batch_X)
-                loss = criterion(pred.squeeze(), batch_y)
-                loss.backward()
-                optimizer.step()
-                losses.append(loss.item())
-
-        self.last_train_loss = np.mean(losses) if losses else 0.0
-        self.is_trained = True
-        return True
-
-    # ------------------------------------------------------------
-    # PREDICTION V6: EV & MQS Gated Inference
-    # ------------------------------------------------------------
     def predict(self, df):
         """
         Zwraca: (predicted_price, confidence, signal)
-        Zasada: EV (Expected Value) > Threshold
         """
-        # 1. Walidacja danych
-        last_close = df['close'].iloc[-1]
-        if len(df) < self.lookback + 5:
-            return last_close, 0.0, "HOLD"
-
-        # 2. MQS HARD GATE (Filtr Toksyczności)
-        # Jeśli rynek jest "śmieciowy", nie tracimy czasu na AI
-        mqs, regime = MarketRegime.analyze(df)
-        if mqs < 35:
-            return last_close, 0.0, "HOLD"
-
-        # 3. Auto-Train (Local Context Adaptation)
         if self.model is None:
-            if not self.train_on_fly(df):
-                return last_close, 0.0, "ERROR"
+            return 0, 0, "NEUTRAL"
 
-        # 4. Przygotowanie tensora
-        X, _ = self._prepare_data(df, is_inference=True)
-        if X is None: return last_close, 0.0, "ERROR"
-        seq = torch.tensor(X[-1]).unsqueeze(0).float().to(self.device)
+        if len(df) < SEQ_LENGTH:
+            return 0, 0, "NEUTRAL"
 
-        # 5. MONTE CARLO DROPOUT INFERENCE
-        self.model.train() # Wymuszamy dropout
-        mc_preds = []
-        iterations = 25
+        try:
+            # 1. Przygotowanie danych (Ostatnie 60 świeczek 'close')
+            data = df['close'].tail(SEQ_LENGTH).values.reshape(-1, 1)
+            current_price = data[-1][0]
 
-        with torch.no_grad():
-            for _ in range(iterations):
-                mc_preds.append(self.model(seq).item())
+            # 2. Skalowanie (Fitujemy na bieżącym oknie - lokalny kontekst jest najważniejszy)
+            self.scaler.fit(data)
+            scaled_data = self.scaler.transform(data)
 
-        # 6. Statystyka Bayesowska
-        mean_log_ret = np.mean(mc_preds)
-        std_dev = np.std(mc_preds) # Epistemic Uncertainty
+            # 3. Konwersja na Tensor
+            X_input = torch.FloatTensor(scaled_data).unsqueeze(0).to(self.device)
 
-        # 7. Dynamiczna Kalibracja Confidence
-        # Sensitivity dostosowane do zmienności (im wyższy ATR, tym mniejsza kara za szum)
-        current_atr = df['atr'].iloc[-1]
-        atr_pct = (current_atr / last_close) * 100
-        # Bazowe sensitivity 80, łagodzone przez ATR (max divisor 2.0)
-        dynamic_sensitivity = 80.0 / max(1.0, atr_pct)
+            # 4. Predykcja
+            with torch.no_grad():
+                prediction_scaled = self.model(X_input)
+                predicted_price = self.scaler.inverse_transform(prediction_scaled.numpy())[0][0]
 
-        confidence = 1.0 / (1.0 + dynamic_sensitivity * std_dev)
-        confidence = max(0.0, min(1.0, confidence))
+            # 5. Logika Decyzyjna V2
+            diff_percent = ((predicted_price - current_price) / current_price) * 100
+            
+            signal = "NEUTRAL"
+            confidence = 0.5
+            threshold = 0.10 # Próg reakcji 0.1%
 
-        # 8. Konwersja na Cenę
-        predicted_price = last_close * np.exp(mean_log_ret)
+            if diff_percent > threshold:
+                signal = "BUY"
+                confidence = min(0.6 + (diff_percent * 2.5), 0.99)
+            elif diff_percent < -threshold:
+                signal = "SELL"
+                confidence = min(0.6 + (abs(diff_percent) * 2.5), 0.99)
 
-        # 9. EXPECTED VALUE (EV) CALCULATION
-        # EV = (Potencjalny Zysk * Prawdopodobieństwo) - (Szum * (1 - Prawdopodobieństwo))
-        move_pct = (predicted_price - last_close) / last_close * 100
+            logger.info(f"🧠 AI V2: {current_price:.2f}$ -> {predicted_price:.2f}$ ({diff_percent:+.2f}%) [{signal}] Conf: {confidence:.2f}")
+            
+            return predicted_price, confidence, signal
 
-        # Jeśli confidence jest niskie, traktujemy ruch jako noise risk
-        ev_score = (move_pct * confidence) - (abs(move_pct) * (1 - confidence) * 0.5)
-
-        # 10. DYNAMIC OPPORTUNITY SCORE (Mniej restrykcyjny w dobrych trendach)
-        signal = "HOLD"
-
-        # Progi adaptacyjne
-        # Jeśli trend jest silny (ACCELERATION), obniżamy progi wejścia
-        is_strong_trend = "ACCELERATION" in regime or "SNIPER" in regime # SNIPER dla kompatybilności
-
-        target_ev = 0.10 if is_strong_trend else 0.18
-        target_conf = 0.50 if is_strong_trend else 0.60
-
-        if ev_score > target_ev and confidence > target_conf and mqs > 35:
-            signal = "BUY"
-        elif ev_score < -target_ev and confidence > target_conf and mqs > 35:
-            signal = "SELL"
-
-        # Blokada Blow-off (Exhaustion Risk)
-        if "BLOW-OFF" in regime:
-            if signal == "BUY":
-                signal = "HOLD" # Nie kupujemy na samej górce przy wyczerpaniu
-            elif signal == "SELL":
-                # Na blow-off top sell jest mile widziany jako reversal
-                pass
-
-        # Reinforcement Learning Snapshot
-        if confidence > 0.7:
-            try:
-                snap = {
-                    "ev": ev_score,
-                    "conf": confidence,
-                    "std": std_dev,
-                    "mqs": mqs
-                }
-                KnowledgeBase.save_pattern("brain_v6", snap, 1.0 if signal == "BUY" else 0.0)
-            except: pass
-
-        return predicted_price, confidence, signal
+        except Exception as e:
+            logger.error(f"❌ [DeepBrain] Błąd predykcji: {e}")
+            return 0, 0, "ERROR"

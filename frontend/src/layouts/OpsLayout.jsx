@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { LayoutDashboard, Cpu, Activity, Wallet, Settings, LogOut, ShieldCheck, Bell, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, Cpu, Activity, Wallet, Settings, LogOut, ShieldCheck, Bell, ShieldAlert, MessageCircle } from 'lucide-react';
 import NotificationDrawer from '../components/NotificationDrawer';
 
 const OpsLayout = ({ children, activeTab, setActiveTab }) => {
@@ -23,7 +23,7 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
 
   const menuItems = [
     { id: 'dashboard', icon: <LayoutDashboard size={18} />, label: 'Overview' },
-    { id: 'trading-hub', icon: <Cpu size={18} />, label: 'Trading Hub' },
+    { id: 'ai-chat', icon: <MessageCircle size={18} />, label: 'AI Chat' },
     { id: 'autopilot', icon: <Activity size={18} />, label: 'AI Trader' },
     { id: 'wallet', icon: <Wallet size={18} />, label: 'Capital' },
     { id: 'ai-settings', icon: <Settings size={18} />, label: 'AI Tuning' },

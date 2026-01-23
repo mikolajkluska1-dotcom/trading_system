@@ -1,0 +1,1 @@
+{"ts": "2026-01-06T22:58:33.490136", "type": "EXECUTION", "schema": "ops_event_v1", "data": {"trade_id": "TRD-20260106225833-BTCUSDT-6966", "signal_id": "MANUAL_API_TRADE", "symbol": "BTC/USDT", "side": "BUY", "entry_price": 93328.13, "qty": 0.0010714883069016811, "cost": 100.0, "status": "FILLED", "env": "PAPER"}}

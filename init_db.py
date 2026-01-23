@@ -54,6 +54,29 @@ def init_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_symbol_time ON market_candles (symbol, time DESC);")
         print("⚡ Indeksy utworzone.")
 
+        # 6. Tworzenie tabeli trade_logs (Śledzenie transakcji AI)
+        print("🔨 Tworzenie tabeli trade_logs...")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS trade_logs (
+                id SERIAL PRIMARY KEY,
+                symbol VARCHAR(20) NOT NULL,
+                action VARCHAR(10) NOT NULL,
+                price DECIMAL(18, 8) NOT NULL,
+                quantity DECIMAL(18, 8) NOT NULL,
+                timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+                pnl DECIMAL(18, 8),
+                ai_confidence DECIMAL(5, 2)
+            );
+        """)
+        print("✅ Tabela trade_logs utworzona.")
+        
+        # 7. Indeksy dla trade_logs
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_trade_symbol ON trade_logs (symbol);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_trade_timestamp ON trade_logs (timestamp DESC);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_trade_status ON trade_logs (status);")
+        print("⚡ Indeksy dla trade_logs utworzone.")
+
         cur.close()
         conn.close()
         print("\n🎉 SUKCES! Baza jest gotowa na przyjęcie danych.")

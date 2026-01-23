@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMission } from '../context/MissionContext';
 import { Activity, Zap, Shield, Power, Cpu, Network, Lock } from 'lucide-react';
 import HudItem from '../components/HUD/HudItem';
@@ -6,6 +6,59 @@ import HudItem from '../components/HUD/HudItem';
 const TradingHub = () => {
     // Connect to the Mission Context (Central Logic)
     const { isAiActive, toggleAiCore, missionStatus, logs } = useMission();
+
+    // Trader Process State (separate from AI Core)
+    const [isTraderRunning, setIsTraderRunning] = useState(false);
+    const [statusMessage, setStatusMessage] = useState('');
+
+    // Check trader status on mount
+    useEffect(() => {
+        const checkTraderStatus = async () => {
+            try {
+                const res = await fetch('/api/trader/status');
+                const data = await res.json();
+                setIsTraderRunning(data.running);
+            } catch (err) {
+                console.error('Failed to fetch trader status:', err);
+            }
+        };
+        checkTraderStatus();
+    }, []);
+
+    // Start/Stop Trader Functions
+    const handleTraderToggle = async () => {
+        try {
+            if (!isTraderRunning) {
+                // START TRADER
+                const res = await fetch('/api/trader/start', { method: 'POST' });
+                const data = await res.json();
+
+                if (res.ok) {
+                    setIsTraderRunning(true);
+                    setStatusMessage(data.message);
+                    // Show notification (you can add a toast library later)
+                    console.log('✅ Trader Started:', data.message);
+                } else {
+                    setStatusMessage('Błąd uruchomienia');
+                }
+            } else {
+                // STOP TRADER
+                const res = await fetch('/api/trader/stop', { method: 'POST' });
+                const data = await res.json();
+
+                if (res.ok) {
+                    setIsTraderRunning(false);
+                    setStatusMessage(data.message);
+                    console.log('🛑 Trader Stopped:', data.message);
+                } else {
+                    setStatusMessage('Błąd zatrzymania');
+                }
+            }
+        } catch (err) {
+            console.error('Trader toggle error:', err);
+            setStatusMessage('Błąd połączenia z serwerem');
+        }
+    };
 
     // Get latest log for status line
     const latestLog = logs.length > 0 ? logs[0].message : "SYSTEM READY";
@@ -33,12 +86,22 @@ const TradingHub = () => {
             {/* --- CENTRAL AVATAR CONTAINER --- */}
             <div className="relative z-10 flex flex-col items-center">
 
-                {/* STATUS HEADER */}
-                <div className="mb-8 flex items-center gap-3 px-6 py-2 rounded-full border border-white/10 bg-black/50 backdrop-blur-md">
-                    <div className={`w-3 h-3 rounded-full ${isAiActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                    <span className="tracking-[0.2em] text-xs font-bold text-gray-400">
-                        {isAiActive ? 'NEURAL LINK: ESTABLISHED' : 'SYSTEM STANDBY'}
-                    </span>
+                {/* STATUS HEADER - Updated with Trader Status */}
+                <div className="mb-8 flex flex-col items-center gap-3">
+                    <div className="flex items-center gap-3 px-6 py-2 rounded-full border border-white/10 bg-black/50 backdrop-blur-md">
+                        <div className={`w-3 h-3 rounded-full ${isAiActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                        <span className="tracking-[0.2em] text-xs font-bold text-gray-400">
+                            {isAiActive ? 'NEURAL LINK: ESTABLISHED' : 'SYSTEM STANDBY'}
+                        </span>
+                    </div>
+
+                    {/* TRADER STATUS INDICATOR */}
+                    {isTraderRunning && (
+                        <div className="flex items-center gap-2 px-4 py-1 rounded-full border border-green-500/30 bg-green-900/20 backdrop-blur-md animate-pulse">
+                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                            <span className="text-[10px] font-mono text-green-400 tracking-wider">STATUS: TRADER ONLINE 🟢</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* AVATAR RING */}
@@ -90,17 +153,32 @@ const TradingHub = () => {
                         </div>
                     </div>
 
-                    {/* ACTIVATE BUTTON (OVERLAY) */}
-                    <button
-                        onClick={() => toggleAiCore(!isAiActive)}
-                        className={`absolute -bottom-6 left-1/2 -translate-x-1/2 px-8 py-3 rounded-xl font-bold tracking-widest uppercase transition-all shadow-xl flex items-center gap-3 border z-20 whitespace-nowrap ${isAiActive
-                            ? 'bg-red-900/80 border-red-500 text-red-200 hover:bg-red-800'
-                            : 'bg-green-900/80 border-green-500 text-green-200 hover:bg-green-800'
-                            }`}
-                    >
-                        <Power size={18} />
-                        {isAiActive ? 'STOP SYSTEM' : 'INITIALIZE'}
-                    </button>
+                    {/* DUAL BUTTON LAYOUT */}
+                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 flex gap-4 z-20">
+                        {/* AI CORE BUTTON */}
+                        <button
+                            onClick={() => toggleAiCore(!isAiActive)}
+                            className={`px-6 py-3 rounded-xl font-bold tracking-widest uppercase transition-all shadow-xl flex items-center gap-2 border whitespace-nowrap text-sm ${isAiActive
+                                ? 'bg-red-900/80 border-red-500 text-red-200 hover:bg-red-800'
+                                : 'bg-green-900/80 border-green-500 text-green-200 hover:bg-green-800'
+                                }`}
+                        >
+                            <Power size={16} />
+                            {isAiActive ? 'STOP AI' : 'START AI'}
+                        </button>
+
+                        {/* TRADER BUTTON - With Pulsing Effect When Active */}
+                        <button
+                            onClick={handleTraderToggle}
+                            className={`px-6 py-3 rounded-xl font-bold tracking-widest uppercase transition-all shadow-xl flex items-center gap-2 border whitespace-nowrap text-sm ${isTraderRunning
+                                    ? 'bg-red-600/90 border-red-400 text-white hover:bg-red-700 animate-pulse'
+                                    : 'bg-blue-900/80 border-blue-500 text-blue-200 hover:bg-blue-800'
+                                }`}
+                        >
+                            <Zap size={16} className={isTraderRunning ? 'animate-pulse' : ''} />
+                            {isTraderRunning ? 'DEACTIVATE' : 'INITIALIZE AI'}
+                        </button>
+                    </div>
                 </div>
 
                 {/* --- LIVE ACTIVITY FEED (Smart Parser) --- */}

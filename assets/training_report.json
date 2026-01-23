@@ -1,0 +1,23 @@
+{
+    "timestamp": "2026-01-17T00:03:43.628675",
+    "model_version": "DeepBrain V4.5",
+    "timeframe": "1h",
+    "epochs": 10,
+    "device": "cpu",
+    "assets": [],
+    "errors": [
+        {
+            "asset": "BTC/USDT",
+            "reason": "'volume'"
+        },
+        {
+            "asset": "ETH/USDT",
+            "reason": "'volume'"
+        },
+        {
+            "asset": "SOL/USDT",
+            "reason": "'volume'"
+        }
+    ],
+    "duration_sec": 12.97
+}

@@ -12,12 +12,11 @@ services:
     volumes:
       - .:/app
       - ./assets:/app/assets
-    # FORCE BIND TO 0.0.0.0 so n8n can see it
+    # Bind to 0.0.0.0 so n8n can see it
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       - PYTHONUNBUFFERED=1
       - N8N_WEBHOOK_URL=http://redline_n8n:5678/webhook/
-      # Dodajemy namiary na bazę danych, żeby Python wiedział gdzie uderzać
       - DB_HOST=timescaledb
       - DB_NAME=redline_db
       - DB_USER=redline_user
@@ -64,21 +63,28 @@ services:
       - timescaledb
 
   # --- DATABASE (TIMESCALE DB / POSTGRES) ---
-  # TO JEST NOWA SEKCJA, KTÓRĄ DODAJEMY
+  # TUNING POD 64GB RAM
   timescaledb:
     image: timescale/timescaledb:latest-pg14
-    # ... inne linie bez zmian ...
-    ports:
-      - "5435:5432" #ZMIANA TUTAJ (Lewa strona to port Windowsa)
-    # ... reszta bez zmian ...
-    environment:
-      - POSTGRES_USER=redline_user
-      - POSTGRES_PASSWORD=redline_pass
-      - POSTGRES_DB=redline_db
-    volumes:
-      # TUTAJ JEST TWOJE PRZEKIEROWANIE NA DYSK 1TB
-      - R:/Redline_Data/database:/var/lib/postgresql/data
+    container_name: redline_db
     restart: always
+    environment:
+      POSTGRES_USER: redline_user
+      POSTGRES_PASSWORD: redline_pass
+      POSTGRES_DB: redline_db
+    # --- TURBO CONFIG (48GB ALLOCATION LOGIC) ---
+    # shared_buffers=12GB (RAM na sztywno dla bazy)
+    # effective_cache_size=36GB (RAM systemu dostępny dla bazy)
+    command: >
+      postgres  -c shared_buffers=12GB  -c effective_cache_size=36GB  -c maintenance_work_mem=2GB  -c checkpoint_completion_target=0.9  -c wal_buffers=16MB  -c default_statistics_target=100  -c random_page_cost=1.1  -c effective_io_concurrency=200 -c work_mem=32MB -c min_wal_size=1GB -c max_wal_size=4GB
+    ports:
+      - "5435:5432"
+    volumes:
+      # Ścieżka do Twojego dysku R:
+      - R:/Redline_Data/database:/var/lib/postgresql/data
+    networks:
+      default:
+
 
 volumes:
   n8n_data:
