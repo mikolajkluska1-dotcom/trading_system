@@ -206,6 +206,58 @@ async def get_logs():
     # Return the actual captured logs from the buffer
     return LOG_BUFFER
 
+# --- AUTHENTICATION ---
+from security.user_manager import UserManager
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    contact: str
+
+@app.post("/api/auth/login")
+async def login(req: LoginRequest):
+    """
+    Authenticate user with username and password.
+    Returns user data with role if successful.
+    """
+    try:
+        role = UserManager.verify_login(req.username, req.password)
+        if not role:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        from datetime import datetime
+        return {
+            "user": req.username,
+            "role": role,
+            "login_time": datetime.utcnow().isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/auth/register")
+async def register(req: RegisterRequest):
+    """
+    Request a new user account (requires admin approval).
+    """
+    try:
+        success, message = UserManager.request_account(req.username, req.password, req.contact)
+        if not success:
+            raise HTTPException(status_code=400, detail=message)
+        
+        return {"status": "success", "message": message}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Registration error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 # --- DATA MODELS ---
 class WebhookPayload(BaseModel):
     source: str       # e.g., "n8n", "telegram"

@@ -1,77 +1,215 @@
 import React, { useState } from 'react';
-import { UserPlus, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, AlertCircle, Check } from 'lucide-react';
+import * as authApi from '../api/auth';
 
-const Register = ({ onBack }) => {
-  const [formData, setFormData] = useState({ username: '', password: '', contact: '' });
-  const [status, setStatus] = useState({ loading: false, error: null, success: false });
+const Register = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [contact, setContact] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setStatus({ loading: true, error: null, success: false });
+    setError('');
+    setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.detail || 'Registration failed');
-
-      setStatus({ loading: false, error: null, success: true });
+      await authApi.register(username, password, contact);
+      setSuccess(true);
+      setLoading(false);
     } catch (err) {
-      setStatus({ loading: false, error: err.message, success: false });
+      setError(err.message || 'Registration failed');
+      setLoading(false);
     }
   };
 
-  const s = {
-    container: { height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb', fontFamily: '-apple-system, sans-serif' },
-    card: { width: '100%', maxWidth: '400px', background: '#fff', padding: '48px', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #eaeaea' },
-    input: { width: '100%', padding: '12px', marginBottom: '16px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '14px' },
-    btn: { width: '100%', padding: '14px', background: '#111', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }
-  };
-
-  if (status.success) {
+  // Success state
+  if (success) {
     return (
-      <div style={s.container}>
-        <div style={{...s.card, textAlign: 'center'}}>
-          <div style={{fontSize:'48px', marginBottom:'16px'}}>✅</div>
-          <h2 style={{margin:'0 0 8px 0'}}>Request Submitted</h2>
-          <p style={{color:'#666', marginBottom:'24px'}}>Your application has been sent to the System Administrator (ROOT). You will be contacted via the provided ID.</p>
-          <button onClick={onBack} style={s.btn}>Back to Login</button>
+      <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-red-500 selection:text-white overflow-x-hidden relative">
+        {/* Background */}
+        <div className="fixed inset-0 pointer-events-none z-0">
+          <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-red-900/10 rounded-full blur-[120px] animate-pulse" />
+          <div className="absolute bottom-[-10%] right-[20%] w-[600px] h-[600px] bg-purple-900/10 rounded-full blur-[120px]" />
+        </div>
+
+        {/* Navigation */}
+        <nav className="fixed w-full z-50 top-0 left-0 px-6 py-5 flex justify-between items-center backdrop-blur-xl bg-black/40 border-b border-white/5">
+          <div className="text-2xl font-extrabold tracking-tighter flex items-center gap-3">
+            <div className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+            </div>
+            <span className="tracking-widest">REDLINE</span>
+          </div>
+          <button
+            onClick={() => navigate('/login')}
+            className="border border-white/10 hover:bg-white/5 text-white px-6 py-2.5 rounded-full text-sm font-semibold transition duration-300"
+          >
+            Back to Login
+          </button>
+        </nav>
+
+        {/* Success Message */}
+        <div className="relative z-10 min-h-screen flex flex-col justify-center items-center px-4 pt-20">
+          <div className="w-full max-w-md text-center">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/20 border-2 border-green-500/50 mb-8">
+              <Check size={40} className="text-green-500" />
+            </div>
+
+            <h1 className="text-4xl font-extrabold text-white mb-4">Request Submitted</h1>
+            <p className="text-gray-400 mb-8 max-w-md mx-auto">
+              Your application has been sent to the System Administrator. You will be contacted via <span className="text-white font-mono">{contact}</span> once approved.
+            </p>
+
+            <button
+              onClick={() => navigate('/login')}
+              className="bg-red-600 hover:bg-red-500 text-white px-8 py-3.5 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(220,38,38,0.3)] hover:shadow-[0_0_25px_rgba(220,38,38,0.6)]"
+            >
+              Back to Login
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={s.container}>
-      <div style={s.card}>
-        <button onClick={onBack} style={{background:'none', border:'none', cursor:'pointer', marginBottom:'24px', display:'flex', alignItems:'center', gap:'5px', color:'#666', fontSize:'13px'}}>
-          <ArrowLeft size={16} /> Back
+    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-red-500 selection:text-white overflow-x-hidden relative">
+
+      {/* Background (same as landing/login) */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-red-900/10 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[20%] w-[600px] h-[600px] bg-purple-900/10 rounded-full blur-[120px]" />
+      </div>
+
+      {/* Navigation (same as landing/login) */}
+      <nav className="fixed w-full z-50 top-0 left-0 px-6 py-5 flex justify-between items-center backdrop-blur-xl bg-black/40 border-b border-white/5">
+        <div className="text-2xl font-extrabold tracking-tighter flex items-center gap-3">
+          <div className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+          </div>
+          <span className="tracking-widest">REDLINE</span>
+        </div>
+        <button
+          onClick={() => navigate('/')}
+          className="border border-white/10 hover:bg-white/5 text-white px-6 py-2.5 rounded-full text-sm font-semibold transition duration-300"
+        >
+          Back
         </button>
+      </nav>
 
-        <h1 style={{fontSize:'24px', fontWeight:'700', marginBottom:'8px'}}>Join Redline</h1>
-        <p style={{color:'#666', marginBottom:'32px', fontSize:'14px'}}>Submit access request for approval.</p>
+      {/* Registration Form */}
+      <div className="relative z-10 min-h-screen flex flex-col justify-center items-center px-4 pt-20">
 
-        {status.error && <div style={{padding:'12px', background:'#fff2f2', color:'#d32f2f', borderRadius:'8px', marginBottom:'20px', fontSize:'13px'}}>{status.error}</div>}
+        {/* Status Badge */}
+        <div className="inline-flex items-center gap-2 mb-8 px-4 py-1.5 rounded-full border border-green-500/20 bg-green-900/10 backdrop-blur-md">
+          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-green-400">Access Request</span>
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <label style={{fontSize:'12px', fontWeight:'600', display:'block', marginBottom:'6px'}}>Username</label>
-          <input style={s.input} type="text" required value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} placeholder="johndoe" />
+        {/* Title */}
+        <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight text-center">
+          Join REDLINE
+        </h1>
+        <p className="text-gray-400 mb-12 text-center max-w-md font-light">
+          Submit your access request for administrator approval
+        </p>
 
-          <label style={{fontSize:'12px', fontWeight:'600', display:'block', marginBottom:'6px'}}>Password</label>
-          <input style={s.input} type="password" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder="••••••••" />
+        {/* Registration Card */}
+        <div className="w-full max-w-md">
+          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl">
+            <form onSubmit={handleSubmit} className="space-y-6">
 
-          <label style={{fontSize:'12px', fontWeight:'600', display:'block', marginBottom:'6px'}}>Contact ID (Telegram/Email)</label>
-          <input style={s.input} type="text" required value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} placeholder="@telegram_handle" />
+              {/* Username Field */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="block w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all"
+                  placeholder="Choose username"
+                  required
+                />
+              </div>
 
-          <button type="submit" disabled={status.loading} style={{...s.btn, opacity: status.loading ? 0.7 : 1}}>
-            {status.loading ? 'Processing...' : <><UserPlus size={18} /> Submit Request</>}
-          </button>
-        </form>
+              {/* Password Field */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="block w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all"
+                  placeholder="Create password"
+                  required
+                />
+              </div>
+
+              {/* Contact Field */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  Contact ID (Telegram/Email)
+                </label>
+                <input
+                  type="text"
+                  value={contact}
+                  onChange={(e) => setContact(e.target.value)}
+                  className="block w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all"
+                  placeholder="@telegram or email"
+                  required
+                />
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="flex items-center gap-2 text-red-400 text-sm bg-red-900/10 p-3 rounded-xl border border-red-900/20">
+                  <AlertCircle size={16} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white py-3.5 rounded-xl font-bold transition-all transform active:scale-95 disabled:opacity-50 shadow-[0_0_15px_rgba(220,38,38,0.3)] hover:shadow-[0_0_25px_rgba(220,38,38,0.6)]"
+              >
+                {loading ? (
+                  <span className="animate-pulse">Submitting...</span>
+                ) : (
+                  <>
+                    Submit Request
+                    <ArrowRight size={18} />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Footer */}
+            <div className="mt-6 pt-6 border-t border-white/5 text-center">
+              <p className="text-xs text-gray-600">
+                Already have access?{' '}
+                <button
+                  onClick={() => navigate('/login')}
+                  className="text-red-400 hover:text-red-300 font-bold transition-colors"
+                >
+                  Log In
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

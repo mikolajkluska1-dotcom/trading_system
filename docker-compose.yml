@@ -80,11 +80,12 @@ services:
     ports:
       - "5435:5432"
     volumes:
-      # Ścieżka do Twojego dysku R:
-      - R:/Redline_Data/database:/var/lib/postgresql/data
+      - R:/Redline_Data/database:/var/lib/postgresql/data  # <-- WŁĄCZONE - używa bazy z R: drive
+      # - postgres_data_safe:/var/lib/postgresql/data      # <-- WYŁĄCZONE - lokalna baza
     networks:
       default:
 
 
 volumes:
   n8n_data:
+  postgres_data_safe:

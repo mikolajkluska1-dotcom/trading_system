@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { LayoutDashboard, Cpu, Activity, Wallet, Settings, LogOut, ShieldCheck, Bell, ShieldAlert, MessageCircle } from 'lucide-react';
 import NotificationDrawer from '../components/NotificationDrawer';
 
-const OpsLayout = ({ children, activeTab, setActiveTab }) => {
+const OpsLayout = ({ children }) => {
   const { logout, user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [showNotifications, setShowNotifications] = useState(false);
 
   // LIFETIME STATE for Notifications (Lifted up for Red Dot logic)
@@ -22,19 +25,32 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
   };
 
   const menuItems = [
-    { id: 'dashboard', icon: <LayoutDashboard size={18} />, label: 'Overview' },
-    { id: 'ai-chat', icon: <MessageCircle size={18} />, label: 'AI Chat' },
-    { id: 'autopilot', icon: <Activity size={18} />, label: 'AI Trader' },
-    { id: 'wallet', icon: <Wallet size={18} />, label: 'Capital' },
-    { id: 'ai-settings', icon: <Settings size={18} />, label: 'AI Tuning' },
+    { id: 'dashboard', path: '/ops', icon: <LayoutDashboard size={18} />, label: 'Overview' },
+    { id: 'ai-chat', path: '/ops/chat', icon: <MessageCircle size={18} />, label: 'AI Chat' },
+    { id: 'autopilot', path: '/trading', icon: <Activity size={18} />, label: 'AI Trader' },
+    { id: 'wallet', path: '/ops/wallet', icon: <Wallet size={18} />, label: 'Capital' },
+    { id: 'ai-settings', path: '/settings', icon: <Settings size={18} />, label: 'AI Tuning' },
   ];
+
+  // Determine active tab from current path
+  const getActiveTab = () => {
+    const path = location.pathname;
+    if (path === '/ops') return 'dashboard';
+    if (path.includes('/chat')) return 'ai-chat';
+    if (path.includes('/trading')) return 'autopilot';
+    if (path.includes('/wallet')) return 'wallet';
+    if (path.includes('/settings')) return 'ai-settings';
+    return 'dashboard';
+  };
+
+  const activeTab = getActiveTab();
 
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-purple-500/30 overflow-x-hidden relative">
 
       {/* GLOBAL AMBIENT BACKGROUND */}
-      <div className="fixed top-[-20%] left-[-10%] w-[800px] h-[800px] bg-purple-900/15 rounded-full blur-[150px] pointer-events-none z-0" />
-      <div className="fixed bottom-[-20%] right-[-10%] w-[800px] h-[800px] bg-blue-900/10 rounded-full blur-[150px] pointer-events-none z-0" />
+      <div className="fixed top-[-20%] left-[-10%] w-[800px] h-[800px] bg-red-900/15 rounded-full blur-[150px] pointer-events-none z-0" />
+      <div className="fixed bottom-[-20%] right-[-10%] w-[800px] h-[800px] bg-red-900/10 rounded-full blur-[150px] pointer-events-none z-0" />
 
       {/* TOPBAR - Floating Glass */}
       <nav className="fixed top-0 left-0 w-full h-20 z-50 px-6 flex items-center justify-between border-b border-white/[0.08] bg-[#050505]/80 backdrop-blur-xl">
@@ -46,7 +62,7 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
 
           {/* Text Name (hidden on small screens) */}
           <div className="text-xl font-black tracking-tighter text-white hidden md:block">
-            RED<span className="text-purple-500">LINE</span>
+            RED<span className="text-red-500">LINE</span>
           </div>
         </div>
 
@@ -55,11 +71,11 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
           {menuItems.map(item => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => navigate(item.path)}
               className={`
                 flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-300
                 ${activeTab === item.id
-                  ? 'bg-white/[0.1] text-white shadow-[0_0_15px_rgba(255,255,255,0.1)] border border-white/10'
+                  ? 'bg-red-500/20 text-white shadow-[0_0_15px_rgba(239,68,68,0.3)] border border-red-500/30'
                   : 'text-gray-500 hover:text-white hover:bg-white/[0.05]'}
               `}
             >
@@ -87,7 +103,7 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
             {/* Admin Button (Conditional) */}
             {['ROOT', 'ADMIN'].includes(user?.role) && (
               <button
-                onClick={() => setActiveTab('admin')}
+                onClick={() => navigate('/admin')}
                 className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 text-xs font-bold uppercase transition-colors"
               >
                 <ShieldAlert size={14} />
@@ -97,16 +113,16 @@ const OpsLayout = ({ children, activeTab, setActiveTab }) => {
 
             {/* Clickable User Profile "Card" */}
             <div
-              onClick={() => setActiveTab('user-settings')}
+              onClick={() => navigate('/settings')}
               className="flex items-center gap-3 cursor-pointer p-1.5 pr-4 rounded-full border border-transparent hover:bg-white/5 hover:border-white/5 transition-all group"
             >
               {/* Avatar Display */}
-              <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10 group-hover:border-purple-500/50 transition-colors">
+              <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10 group-hover:border-red-500/50 transition-colors">
                 <img src={user?.avatar || "/assets/ai_avatar.png"} alt="Avatar" className="w-full h-full object-cover opacity-80 group-hover:opacity-100" />
               </div>
 
               <div className="hidden sm:block">
-                <div className="text-sm font-bold text-white leading-tight group-hover:text-purple-400 transition-colors">{user?.username || 'Operator'}</div>
+                <div className="text-sm font-bold text-white leading-tight group-hover:text-red-400 transition-colors">{user?.username || 'Operator'}</div>
                 <div className="text-[10px] text-gray-500 font-mono">{user?.role || 'Admin'}</div>
               </div>
             </div>

@@ -1,88 +1,61 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import * as authApi from '../api/auth';
 
-const AuthContext = createContext(null);
+// 1. Tworzymy Context
+export const AuthContext = createContext(null);
 
+// 2. Definiujemy Hook (To naprawi Twój błąd w MissionContext!)
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+// 3. Provider
 export const AuthProvider = ({ children }) => {
-  // 1. LAZY INITIALIZATION (Persistence)
-  const [user, setUser] = useState(() => {
-    try {
-      const savedUser = localStorage.getItem('redline_user_profile');
-      if (savedUser) {
-        return JSON.parse(savedUser);
-      }
-    } catch (e) {
-      console.error("Failed to parse user profile from storage", e);
-    }
-    // Default Operator Profile (Zero State / Auto-Login)
-    return {
-      username: "Operator",
-      role: "ADMIN",
-      email: "admin@redline.sys",
-      avatar: "/assets/ai_avatar.png",
-      isAuthenticated: true
-    };
-  });
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const [token, setToken] = useState(null);
-  const [error, setError] = useState(null);
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const currentUser = await authApi.getCurrentUser();
+        if (currentUser) setUser(currentUser);
+      } catch (error) {
+        console.error("Auth init error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    initAuth();
+  }, []);
 
   const login = async (username, password) => {
     try {
-      setError(null);
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (!response.ok) {
-        throw new Error('ACCESS DENIED');
+      const userData = await authApi.login(username, password);
+      if (userData) {
+        setUser(userData);
+        return true;
       }
-
-      const data = await response.json();
-
-      // Create full user object
-      const userData = {
-        username: data.user,
-        role: data.role,
-        email: "admin@redline.sys", // Default for now
-        avatar: "/assets/ai_avatar.png",
-        isAuthenticated: true
-      };
-
-      // Update State & Storage
-      setUser(userData);
-      localStorage.setItem('redline_user_profile', JSON.stringify(userData));
-
-      setToken(data.token);
-      return true;
-
-    } catch (err) {
-      setError("INVALID CREDENTIALS");
+    } catch (error) {
+      console.error("Login failed:", error);
       return false;
     }
+    return false;
   };
 
   const logout = () => {
+    authApi.logout();
     setUser(null);
-    setToken(null);
-    localStorage.removeItem('redline_user_profile');
-  };
-
-  const updateUserProfile = (updates) => {
-    setUser(prevUser => {
-      const newUser = { ...prevUser, ...updates };
-      // SAVE TO DISK
-      localStorage.setItem('redline_user_profile', JSON.stringify(newUser));
-      return newUser;
-    });
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, updateUserProfile, error }}>
-      {children}
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export default AuthProvider;

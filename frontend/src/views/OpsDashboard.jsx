@@ -159,12 +159,13 @@ const OpsDashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen w-full bg-[#030005] text-white p-6 lg:p-12 relative overflow-hidden font-sans">
+    <div className="min-h-screen w-full bg-[#050505] text-white p-6 lg:p-12 relative overflow-hidden font-sans">
 
-      {/* --- GLOBAL PURPLE GLOW BACKGROUND --- */}
-      <div className="fixed top-[-20%] left-[-10%] w-[1000px] h-[1000px] bg-purple-900/20 rounded-full blur-[180px] pointer-events-none z-0 animate-pulse duration-[10s]" />
-      <div className="fixed bottom-[-10%] right-[-5%] w-[800px] h-[800px] bg-indigo-900/10 rounded-full blur-[150px] pointer-events-none z-0" />
-      <div className="fixed top-[40%] left-[30%] w-[500px] h-[500px] bg-purple-600/5 rounded-full blur-[120px] pointer-events-none z-0" />
+      {/* --- GLOBAL RED GLOW BACKGROUND (matching landing page) --- */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-red-900/10 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[20%] w-[600px] h-[600px] bg-purple-900/10 rounded-full blur-[120px]" />
+      </div>
 
       <div className="relative z-10 max-w-7xl mx-auto space-y-8">
 

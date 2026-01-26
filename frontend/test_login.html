@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redline Login Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            padding: 40px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #ff3b30;
+            text-align: center;
+        }
+
+        .form-group {
+            margin: 20px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #00ff41;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            background: #1a1a1a;
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #ff3b30;
+            border: none;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #ff5545;
+        }
+
+        #result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #1a1a1a;
+            border: 1px solid #00ff41;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+
+        .success {
+            color: #00ff41;
+        }
+
+        .error {
+            color: #ff3b30;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔴 REDLINE LOGIN TEST</h1>
+
+    <form id="loginForm">
+        <div class="form-group">
+            <label for="username">USERNAME:</label>
+            <input type="text" id="username" value="admin" required>
+        </div>
+
+        <div class="form-group">
+            <label for="password">PASSWORD:</label>
+            <input type="password" id="password" value="admin123" required>
+        </div>
+
+        <button type="submit">🔐 TEST LOGIN</button>
+    </form>
+
+    <div id="result"></div>
+
+    <script>
+        const API_URL = 'http://localhost:8000/api/auth/login';
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('result');
+
+            resultDiv.innerHTML = '⏳ Testing login...\n\n';
+            resultDiv.className = '';
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultDiv.className = 'success';
+                    resultDiv.innerHTML = `✅ LOGIN SUCCESSFUL!\n\n` +
+                        `Response:\n${JSON.stringify(data, null, 2)}\n\n` +
+                        `Status: ${response.status}\n` +
+                        `User: ${data.user}\n` +
+                        `Role: ${data.role}\n` +
+                        `Login Time: ${data.login_time}`;
+                } else {
+                    resultDiv.className = 'error';
+                    resultDiv.innerHTML = `❌ LOGIN FAILED!\n\n` +
+                        `Status: ${response.status}\n` +
+                        `Error: ${data.detail || 'Unknown error'}\n\n` +
+                        `Response:\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `❌ CONNECTION ERROR!\n\n` +
+                    `Error: ${error.message}\n\n` +
+                    `Make sure the backend is running at:\n${API_URL}`;
+            }
+        });
+
+        // Auto-test on page load
+        window.addEventListener('load', () => {
+            document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+        });
+    </script>
+</body>
+
+</html>
