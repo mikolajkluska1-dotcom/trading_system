@@ -30,7 +30,8 @@ plotly
 cryptography
 websockets
 
-# --- Database (Dla pewności) ---
+# --- Database ---
 psycopg2-binary
 sqlalchemy
 asyncpg
+aiopg

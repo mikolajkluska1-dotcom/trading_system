@@ -13,7 +13,7 @@ services:
       - .:/app
       - ./assets:/app/assets
     # Bind to 0.0.0.0 so n8n can see it
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn agents.BackendAPI.backend.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       - PYTHONUNBUFFERED=1
       - N8N_WEBHOOK_URL=http://redline_n8n:5678/webhook/
@@ -34,7 +34,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./frontend:/app
+      - ./agents/Frontend/frontend:/app
       - /app/node_modules
     environment:
       - VITE_API_URL=http://localhost:8000
@@ -80,7 +80,7 @@ services:
     ports:
       - "5435:5432"
     volumes:
-      - R:/Redline_Data/database:/var/lib/postgresql/data  # <-- WŁĄCZONE - używa bazy z R: drive
+      - R:/Redline_Data/database:/var/lib/postgresql/data # <-- WŁĄCZONE - używa bazy z R: drive
       # - postgres_data_safe:/var/lib/postgresql/data      # <-- WYŁĄCZONE - lokalna baza
     networks:
       default:
