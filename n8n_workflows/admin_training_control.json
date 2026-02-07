@@ -1,0 +1,158 @@
+{
+    "name": "🔧 Admin - Training Control",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "admin/training",
+                "options": {}
+            },
+            "id": "webhook",
+            "name": "🔔 Training Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                0,
+                300
+            ],
+            "webhookId": "admin-training"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.action }}",
+                            "rightValue": "start",
+                            "operator": {
+                                "type": "string",
+                                "operation": "equals"
+                            }
+                        }
+                    ]
+                }
+            },
+            "id": "check-action",
+            "name": "🎯 What Action?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/admin/training/start",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\"epochs\": {{ $json.epochs || 10 }}, \"interval\": \"{{ $json.interval || '1h' }}\"}"
+            },
+            "id": "start-training",
+            "name": "▶️ Start Training",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                500,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/admin/training/stop"
+            },
+            "id": "stop-training",
+            "name": "⏹️ Stop Training",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                500,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "name": "response",
+                            "value": "Training command executed",
+                            "type": "string"
+                        },
+                        {
+                            "name": "action",
+                            "value": "={{ $json.action }}",
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "id": "response",
+            "name": "📤 Response",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                740,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "🔔 Training Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "🎯 What Action?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🎯 What Action?": {
+            "main": [
+                [
+                    {
+                        "node": "▶️ Start Training",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "⏹️ Stop Training",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "▶️ Start Training": {
+            "main": [
+                [
+                    {
+                        "node": "📤 Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "⏹️ Stop Training": {
+            "main": [
+                [
+                    {
+                        "node": "📤 Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

@@ -1,0 +1,252 @@
+{
+    "name": "🧠 Mother Brain Command Center",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "minutes",
+                            "minutesInterval": 5
+                        }
+                    ]
+                }
+            },
+            "id": "status-trigger",
+            "name": "⏱️ Every 5 Minutes",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                0,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "http://redline_backend:8000/api/ai/status",
+                "options": {
+                    "timeout": 15000
+                }
+            },
+            "id": "get-ai-status",
+            "name": "🧠 Get AI Status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                220,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "http://redline_backend:8000/api/portfolio/balance",
+                "options": {
+                    "timeout": 10000
+                }
+            },
+            "id": "get-balance",
+            "name": "💰 Get Portfolio",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                220,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "http://redline_backend:8000/api/trades/recent?limit=10",
+                "options": {
+                    "timeout": 10000
+                }
+            },
+            "id": "get-trades",
+            "name": "📊 Recent Trades",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                220,
+                600
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// MOTHER BRAIN DASHBOARD GENERATOR\nconst ai = $input.first().json;\nconst portfolio = $('💰 Get Portfolio').first().json;\nconst trades = $('📊 Recent Trades').all().map(t => t.json);\n\n// AI Performance Metrics\nconst generation = ai.generation || 0;\nconst winRate = ai.win_rate || 0;\nconst sharpeRatio = ai.sharpe_ratio || 0;\nconst totalTrades = ai.total_trades || 0;\nconst profitableTrades = ai.profitable_trades || 0;\n\n// Portfolio Status\nconst balance = portfolio.total_balance || 10000;\nconst pnl = portfolio.unrealized_pnl || 0;\nconst pnlPercent = portfolio.pnl_percent || 0;\nconst openPositions = portfolio.open_positions || 0;\n\n// Health Indicators\nlet healthStatus = '🟢 HEALTHY';\nlet healthScore = 100;\n\nif (winRate < 0.4) {\n  healthScore -= 30;\n}\nif (sharpeRatio < 0) {\n  healthScore -= 20;\n}\nif (pnlPercent < -10) {\n  healthScore -= 25;\n}\nif (generation < 100) {\n  healthScore -= 10; // Still learning\n}\n\nif (healthScore < 50) {\n  healthStatus = '🔴 CRITICAL';\n} else if (healthScore < 70) {\n  healthStatus = '🟠 WARNING';\n} else if (healthScore < 90) {\n  healthStatus = '🟡 CAUTION';\n}\n\n// Recent trade analysis\nconst recentWins = trades.filter(t => t.profit > 0).length;\nconst recentLosses = trades.filter(t => t.profit < 0).length;\nconst recentPnL = trades.reduce((sum, t) => sum + (t.profit || 0), 0);\n\n// Generate report\nconst report = {\n  // Header\n  title: '🧠 MOTHER BRAIN STATUS REPORT',\n  timestamp: new Date().toISOString(),\n  \n  // AI Stats\n  ai_generation: generation,\n  ai_win_rate: (winRate * 100).toFixed(1) + '%',\n  ai_sharpe_ratio: sharpeRatio.toFixed(3),\n  ai_total_trades: totalTrades,\n  \n  // Portfolio\n  balance: '$' + balance.toFixed(2),\n  unrealized_pnl: (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2),\n  pnl_percent: (pnlPercent >= 0 ? '+' : '') + pnlPercent.toFixed(2) + '%',\n  open_positions: openPositions,\n  \n  // Health\n  health_status: healthStatus,\n  health_score: healthScore + '/100',\n  \n  // Recent Performance\n  recent_wins: recentWins,\n  recent_losses: recentLosses,\n  recent_pnl: (recentPnL >= 0 ? '+' : '') + '$' + recentPnL.toFixed(2),\n  \n  // Summary\n  summary: `${healthStatus} | Gen: ${generation} | Win Rate: ${(winRate*100).toFixed(1)}% | Balance: $${balance.toFixed(0)} (${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(1)}%)`\n};\n\nreturn [{json: report}];"
+            },
+            "id": "generate-report",
+            "name": "📋 Generate Dashboard",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                500,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.health_status }}",
+                            "rightValue": "🟢 HEALTHY",
+                            "operator": {
+                                "type": "string",
+                                "operation": "notEquals"
+                            }
+                        }
+                    ]
+                }
+            },
+            "id": "health-check",
+            "name": "⚠️ Health Issue?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                740,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/alert/health",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"status\": \"{{ $json.health_status }}\",\n  \"score\": {{ parseInt($json.health_score) }},\n  \"summary\": \"{{ $json.summary }}\"\n}"
+            },
+            "id": "health-alert",
+            "name": "🚨 Health Alert",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                980,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/dashboard/update",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json) }}"
+            },
+            "id": "update-dashboard",
+            "name": "📊 Update Dashboard",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                980,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/log",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"type\": \"STATUS_REPORT\",\n  \"data\": {{ JSON.stringify($json) }}\n}"
+            },
+            "id": "log-status",
+            "name": "📝 Log Report",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1220,
+                400
+            ]
+        }
+    ],
+    "connections": {
+        "⏱️ Every 5 Minutes": {
+            "main": [
+                [
+                    {
+                        "node": "🧠 Get AI Status",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "💰 Get Portfolio",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "📊 Recent Trades",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🧠 Get AI Status": {
+            "main": [
+                [
+                    {
+                        "node": "📋 Generate Dashboard",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "📋 Generate Dashboard": {
+            "main": [
+                [
+                    {
+                        "node": "⚠️ Health Issue?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "⚠️ Health Issue?": {
+            "main": [
+                [
+                    {
+                        "node": "🚨 Health Alert",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "📊 Update Dashboard",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🚨 Health Alert": {
+            "main": [
+                [
+                    {
+                        "node": "📝 Log Report",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "📊 Update Dashboard": {
+            "main": [
+                [
+                    {
+                        "node": "📝 Log Report",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

@@ -5,6 +5,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from agents.Database.core.exchange_config import get_binance_exchange
 
 # Próba importu wskaźników (bezpieczna)
 try:
@@ -17,8 +18,8 @@ except ImportError:
 class DataFeed:
     @staticmethod
     def get_market_data(symbol: str, tf: str = "1h", limit: int = 100):
-        # 1. Inicjalizacja
-        exchange = ccxt.binance({'enableRateLimit': True})
+        # 1. Inicjalizacja z Testnet support
+        exchange = get_binance_exchange(auth=False)
         df = pd.DataFrame()
 
         try:

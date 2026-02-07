@@ -7,8 +7,11 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 ENV/
 build/
+models/
+models/checkpoints/
 develop-eggs/
 dist/
 downloads/

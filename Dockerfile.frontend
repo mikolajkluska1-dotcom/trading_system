@@ -4,13 +4,13 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Kopiowanie definicji zależności
-COPY frontend/package.json frontend/package-lock.json ./
+COPY agents/Frontend/frontend/package.json agents/Frontend/frontend/package-lock.json ./
 
 # Instalacja zależności
 RUN npm install
 
 # Kopiowanie kodu źródłowego
-COPY frontend/ ./
+COPY agents/Frontend/frontend/ ./
 
 # Port Vite
 EXPOSE 5173

@@ -1,0 +1,148 @@
+{
+    "name": "🔧 Admin - Backup Checkpoints",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "cronExpression",
+                            "expression": "0 3 * * *"
+                        }
+                    ]
+                }
+            },
+            "id": "backup-trigger",
+            "name": "📅 Daily at 3:00 AM",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                0,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/admin/backup",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "{\"include\": [\"checkpoints\", \"logs\", \"config\"]}",
+                "options": {
+                    "timeout": 300000
+                }
+            },
+            "id": "create-backup",
+            "name": "💾 Create Backup",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.success }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ]
+                }
+            },
+            "id": "backup-success",
+            "name": "✅ Backup OK?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                480,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/log",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\"type\": \"BACKUP_SUCCESS\", \"size\": \"{{ $json.size_mb }}MB\", \"path\": \"{{ $json.backup_path }}\"}"
+            },
+            "id": "log-success",
+            "name": "📝 Log Success",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                720,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/admin/alert",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\"type\": \"BACKUP_FAILED\", \"error\": \"{{ $json.error }}\"}"
+            },
+            "id": "alert-failure",
+            "name": "🚨 Alert Failure",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                720,
+                400
+            ]
+        }
+    ],
+    "connections": {
+        "📅 Daily at 3:00 AM": {
+            "main": [
+                [
+                    {
+                        "node": "💾 Create Backup",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "💾 Create Backup": {
+            "main": [
+                [
+                    {
+                        "node": "✅ Backup OK?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "✅ Backup OK?": {
+            "main": [
+                [
+                    {
+                        "node": "📝 Log Success",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "🚨 Alert Failure",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

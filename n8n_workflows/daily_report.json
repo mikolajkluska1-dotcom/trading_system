@@ -1,0 +1,110 @@
+{
+    "name": "📊 Daily Performance Report",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "cronExpression",
+                            "expression": "0 20 * * *"
+                        }
+                    ]
+                }
+            },
+            "id": "daily-trigger",
+            "name": "📅 Daily at 20:00",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                0,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "http://redline_backend:8000/api/report/daily",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "id": "get-report",
+            "name": "📊 Get Daily Stats",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const data = $input.first().json;\n\nconst report = `\n📊 DAILY TRADING REPORT\n========================\n📅 Date: ${new Date().toLocaleDateString()}\n\n💰 PORTFOLIO\n• Balance: $${(data.balance || 0).toFixed(2)}\n• Daily P&L: ${data.daily_pnl >= 0 ? '+' : ''}$${(data.daily_pnl || 0).toFixed(2)} (${data.daily_pnl_pct >= 0 ? '+' : ''}${(data.daily_pnl_pct || 0).toFixed(2)}%)\n\n📈 TRADES\n• Total: ${data.trades_count || 0}\n• Wins: ${data.wins || 0} | Losses: ${data.losses || 0}\n• Win Rate: ${((data.win_rate || 0) * 100).toFixed(1)}%\n\n🧠 AI STATUS\n• Generation: ${data.ai_generation || 'N/A'}\n• Sharpe Ratio: ${(data.sharpe_ratio || 0).toFixed(3)}\n\n🐋 WHALE ACTIVITY\n• Signals: ${data.whale_signals || 0}\n• Correlation: ${((data.whale_correlation || 0) * 100).toFixed(0)}%\n`;\n\nreturn [{json: {report: report, ...data}}];"
+            },
+            "id": "format-report",
+            "name": "📝 Format Report",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                480,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/log",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\"type\": \"DAILY_REPORT\", \"data\": {{ JSON.stringify($json) }}}"
+            },
+            "id": "save-report",
+            "name": "💾 Save Report",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                720,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "📅 Daily at 20:00": {
+            "main": [
+                [
+                    {
+                        "node": "📊 Get Daily Stats",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "📊 Get Daily Stats": {
+            "main": [
+                [
+                    {
+                        "node": "📝 Format Report",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "📝 Format Report": {
+            "main": [
+                [
+                    {
+                        "node": "💾 Save Report",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

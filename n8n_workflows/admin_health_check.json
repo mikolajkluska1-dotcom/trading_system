@@ -1,0 +1,179 @@
+{
+    "name": "🔧 Admin - System Health Check",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "minutes",
+                            "minutesInterval": 10
+                        }
+                    ]
+                }
+            },
+            "id": "health-trigger",
+            "name": "⏱️ Every 10 Minutes",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                0,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "http://redline_backend:8000/health",
+                "options": {
+                    "timeout": 5000
+                }
+            },
+            "id": "check-backend",
+            "name": "🔌 Check Backend",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                240,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "http://redline_frontend:3000",
+                "options": {
+                    "timeout": 5000
+                }
+            },
+            "id": "check-frontend",
+            "name": "🎨 Check Frontend",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                240,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const backend = $('🔌 Check Backend').first();\nconst frontend = $('🎨 Check Frontend').first();\n\nlet status = '🟢 ALL SYSTEMS OK';\nlet issues = [];\n\nif (!backend.json || backend.json.status !== 'ok') {\n  issues.push('Backend down');\n}\nif (!frontend.json) {\n  issues.push('Frontend down');\n}\n\nif (issues.length > 0) {\n  status = '🔴 SYSTEM ISSUES: ' + issues.join(', ');\n}\n\nreturn [{json: {\n  status: status,\n  backend_ok: !issues.includes('Backend down'),\n  frontend_ok: !issues.includes('Frontend down'),\n  timestamp: new Date().toISOString(),\n  needs_alert: issues.length > 0\n}}];"
+            },
+            "id": "analyze-health",
+            "name": "📊 Analyze Health",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                500,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.needs_alert }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ]
+                }
+            },
+            "id": "needs-alert",
+            "name": "⚠️ Issues Found?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                740,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/admin/alert",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\"type\": \"SYSTEM_DOWN\", \"message\": \"{{ $json.status }}\"}"
+            },
+            "id": "send-alert",
+            "name": "🚨 Send Admin Alert",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                980,
+                200
+            ]
+        }
+    ],
+    "connections": {
+        "⏱️ Every 10 Minutes": {
+            "main": [
+                [
+                    {
+                        "node": "🔌 Check Backend",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "🎨 Check Frontend",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🔌 Check Backend": {
+            "main": [
+                [
+                    {
+                        "node": "📊 Analyze Health",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🎨 Check Frontend": {
+            "main": [
+                [
+                    {
+                        "node": "📊 Analyze Health",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "📊 Analyze Health": {
+            "main": [
+                [
+                    {
+                        "node": "⚠️ Issues Found?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "⚠️ Issues Found?": {
+            "main": [
+                [
+                    {
+                        "node": "🚨 Send Admin Alert",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                []
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

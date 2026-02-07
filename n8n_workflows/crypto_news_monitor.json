@@ -1,0 +1,110 @@
+{
+    "name": "📰 Crypto News Monitor",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "minutes",
+                            "minutesInterval": 15
+                        }
+                    ]
+                }
+            },
+            "id": "news-trigger",
+            "name": "⏱️ Every 15 Minutes",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                0,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "https://cryptopanic.com/api/v1/posts/?auth_token={{ $env.CRYPTOPANIC_TOKEN }}&currencies=BTC,ETH&filter=hot",
+                "options": {
+                    "timeout": 15000
+                }
+            },
+            "id": "get-news",
+            "name": "📰 Fetch Crypto News",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const news = $input.first().json.results || [];\nconst analyzed = [];\n\nfor (const item of news.slice(0, 5)) {\n  let sentiment = 'NEUTRAL';\n  let score = 0;\n  \n  const title = (item.title || '').toLowerCase();\n  \n  // Simple sentiment\n  const bullish = ['surge', 'soar', 'rally', 'bullish', 'pump', 'gains', 'ath', 'adoption', 'institutional'];\n  const bearish = ['crash', 'dump', 'bearish', 'hack', 'ban', 'scam', 'lawsuit', 'sec', 'investigation'];\n  \n  for (const word of bullish) {\n    if (title.includes(word)) score += 1;\n  }\n  for (const word of bearish) {\n    if (title.includes(word)) score -= 1;\n  }\n  \n  if (score > 0) sentiment = 'BULLISH';\n  else if (score < 0) sentiment = 'BEARISH';\n  \n  analyzed.push({\n    title: item.title,\n    url: item.url,\n    source: item.source?.title || 'Unknown',\n    sentiment: sentiment,\n    score: score,\n    published: item.published_at\n  });\n}\n\nreturn analyzed.map(a => ({json: a}));"
+            },
+            "id": "analyze-news",
+            "name": "🔍 Analyze Sentiment",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                480,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/ai/news_signal",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({news: $json}) }}"
+            },
+            "id": "send-to-ai",
+            "name": "🧠 Send to AI",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                720,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "⏱️ Every 15 Minutes": {
+            "main": [
+                [
+                    {
+                        "node": "📰 Fetch Crypto News",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "📰 Fetch Crypto News": {
+            "main": [
+                [
+                    {
+                        "node": "🔍 Analyze Sentiment",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🔍 Analyze Sentiment": {
+            "main": [
+                [
+                    {
+                        "node": "🧠 Send to AI",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

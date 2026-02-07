@@ -12,6 +12,8 @@ from data.feed import DataFeed
 from agents.BackendAPI.backend.ai_core import RedlineAICore
 from agents.AIBrain.trading.wallet import WalletManager
 
+from agents.Database.core.exchange_config import get_binance_exchange
+
 # Konfiguracja logowania
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [SCANNER] %(message)s')
 logger = logging.getLogger("SCANNER")
@@ -23,12 +25,10 @@ class MarketScanner:
 
     def __init__(self, ai_core: RedlineAICore):
         self.ai_core = ai_core
-        # Wymuszenie czystej instancji publicznej (bez kluczy, bez błędów auth)
+        # Używamy nowego helpera z automatycznym Testnet detection
         try:
-            self.exchange = ccxt.binance({
-                'enableRateLimit': True,
-                'options': {'defaultType': 'spot'}
-            })
+            self.exchange = get_binance_exchange(auth=False)
+            logger.info("✅ Exchange initialized successfully")
         except Exception as e:
             logger.error(f"⚠️ CCXT Init Failed: {e}")
             self.exchange = None
@@ -39,6 +39,18 @@ class MarketScanner:
         self.signal_memory = {}
         self.trade_cooldowns = {}
         self.error_count = 0
+        
+        # v3 DNA
+        self.dna = {
+            'ema_fast': 9,
+            'ema_slow': 21,
+            'bullish_threshold': 0.002,
+            'bearish_threshold': 0.002,
+            'min_trend_strength': 0.1
+        }
+        
+        # v3 state for attention mechanism
+        self.last_analysis = {'signal': 'HOLD', 'score': 0.0}
 
     def get_dynamic_watchlist(self, limit=30):
         """Pobiera Top Płynne Aktywa z potężnym fallbackiem"""

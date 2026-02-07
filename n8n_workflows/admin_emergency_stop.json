@@ -1,0 +1,157 @@
+{
+    "name": "🔧 Admin - Emergency Stop",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "admin/emergency-stop",
+                "options": {}
+            },
+            "id": "emergency-webhook",
+            "name": "🚨 Emergency Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                0,
+                300
+            ],
+            "webhookId": "emergency-stop"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/admin/trading/stop",
+                "options": {
+                    "timeout": 5000
+                }
+            },
+            "id": "stop-trading",
+            "name": "🛑 Stop All Trading",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                240,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/admin/positions/close-all",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "id": "close-positions",
+            "name": "💰 Close All Positions",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                240,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/log",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\"type\": \"EMERGENCY_STOP\", \"triggered_by\": \"{{ $json.triggered_by || 'admin' }}\", \"reason\": \"{{ $json.reason || 'Manual stop' }}\"}"
+            },
+            "id": "log-emergency",
+            "name": "📝 Log Emergency",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                500,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "name": "status",
+                            "value": "🛑 EMERGENCY STOP EXECUTED",
+                            "type": "string"
+                        },
+                        {
+                            "name": "trading_stopped",
+                            "value": true,
+                            "type": "boolean"
+                        },
+                        {
+                            "name": "positions_closed",
+                            "value": true,
+                            "type": "boolean"
+                        }
+                    ]
+                }
+            },
+            "id": "response",
+            "name": "📤 Confirm Stop",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                740,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "🚨 Emergency Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "🛑 Stop All Trading",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "💰 Close All Positions",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🛑 Stop All Trading": {
+            "main": [
+                [
+                    {
+                        "node": "📝 Log Emergency",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "💰 Close All Positions": {
+            "main": [
+                [
+                    {
+                        "node": "📝 Log Emergency",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "📝 Log Emergency": {
+            "main": [
+                [
+                    {
+                        "node": "📤 Confirm Stop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

@@ -1,0 +1,155 @@
+{
+    "name": "🤖 AI Trading - Pure Orchestrator",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "minutes",
+                            "minutesInterval": 1
+                        }
+                    ]
+                }
+            },
+            "id": "trigger",
+            "name": "⏱️ Every Minute",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                0,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/ai/tick",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "{\"source\": \"n8n\", \"timestamp\": \"{{ $now.toISO() }}\"}",
+                "options": {
+                    "timeout": 60000
+                }
+            },
+            "id": "call-ai",
+            "name": "🧠 Call Mother Brain",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.should_trade }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ]
+                }
+            },
+            "id": "check-trade",
+            "name": "📊 AI Says Trade?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                480,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/trade/execute",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json.trade_order) }}",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "id": "execute",
+            "name": "💰 Execute AI Order",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                720,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "name": "status",
+                            "value": "AI decided: HOLD",
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "id": "log-hold",
+            "name": "📋 AI Says Hold",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                720,
+                400
+            ]
+        }
+    ],
+    "connections": {
+        "⏱️ Every Minute": {
+            "main": [
+                [
+                    {
+                        "node": "🧠 Call Mother Brain",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🧠 Call Mother Brain": {
+            "main": [
+                [
+                    {
+                        "node": "📊 AI Says Trade?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "📊 AI Says Trade?": {
+            "main": [
+                [
+                    {
+                        "node": "💰 Execute AI Order",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "📋 AI Says Hold",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

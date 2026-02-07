@@ -20,9 +20,9 @@ from agents.AIBrain.ml.child_agents.base_agent import (
 )
 
 # Configuration
-MOTHER_MODEL_PATH = "R:/Redline_Data/ai_models/mother_brain/mother_v1.pth"
-CHECKPOINT_DIR = "R:/Redline_Data/checkpoints/"
-EVOLUTION_LOG_DIR = "R:/Redline_Data/evolution_logs/"
+MOTHER_MODEL_PATH = "c:/Users/Mikołaj/trading_system/models/mother_v1.pth"
+CHECKPOINT_DIR = "c:/Users/Mikołaj/trading_system/models/checkpoints/"
+EVOLUTION_LOG_DIR = "c:/Users/Mikołaj/trading_system/logs/evolution/"
 
 # Logger
 logger = logging.getLogger("MOTHER_BRAIN")
@@ -50,7 +50,9 @@ class MotherBrain:
     """
     
     def __init__(self):
-        self.device = torch.device("cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if self.device.type == "cuda":
+            logger.info(f"🚀 [Mother Brain] GPU ACCELERATION ENABLED: {torch.cuda.get_device_name(0)}")
         self.scaler = MinMaxScaler(feature_range=(0, 1))
         
         # LSTM model for price prediction (from existing brain.py)
@@ -249,28 +251,113 @@ class MotherBrain:
         
         decision['reasoning'].append(f"Children: BUY={child_signals['BUY']:.2f} SELL={child_signals['SELL']:.2f}")
         
-        # 3. Final decision (combine LSTM + children)
-        buy_score = child_signals['BUY']
-        sell_score = child_signals['SELL']
+        # 3. STRATEGIC SCENARIO PLANNING (NEW FEATURE)
+        # Zamiast podejmować jedną decyzję, generujemy wiele scenariuszy
+        # i wybieramy ten z najwyższą wartością oczekiwaną (EV)
         
-        if lstm_signal == 'BUY':
-            buy_score += 0.3
-        elif lstm_signal == 'SELL':
-            sell_score += 0.3
+        best_scenario = self._evaluate_scenarios(market_data, child_signals, lstm_signal)
         
-        # Make decision
-        if buy_score > 0.6:
-            decision['action'] = 'BUY'
-            decision['confidence'] = buy_score
-        elif sell_score > 0.6:
-            decision['action'] = 'SELL'
-            decision['confidence'] = sell_score
-        else:
-            decision['action'] = 'HOLD'
-            decision['confidence'] = 0.5
-        
-        logger.info(f"🧠 [Mother Brain] Decision: {decision['action']} (Conf: {decision['confidence']:.2f})")
+        decision = best_scenario
+        logger.info(f"🧠 [Mother Brain] Selected Scenario: {decision['action']} (Conf: {decision['confidence']:.2f}) - {decision['setup_name']}")
         return decision
+        
+    def _evaluate_scenarios(self, market_data, child_signals, lstm_signal):
+        """
+        Generuje i ocenia masę scenariuszy (Monte Carlo Lite)
+        Wybiera ten z najlepszym Risk/Reward i pewnością
+        """
+        base_confidence = 0.5
+        bias = 'NEUTRAL'
+        
+        # Oblicz bazową pewność kierunku
+        buy_score = child_signals.get('BUY', 0)
+        sell_score = child_signals.get('SELL', 0)
+        
+        if lstm_signal == 'BUY': buy_score += 0.3
+        elif lstm_signal == 'SELL': sell_score += 0.3
+            
+        if buy_score > 0.6: 
+            bias = 'BUY'
+            base_confidence = buy_score
+        elif sell_score > 0.6: 
+            bias = 'SELL'
+            base_confidence = sell_score
+            
+        if bias == 'NEUTRAL':
+            return {'action': 'HOLD', 'confidence': 0.5, 'setup_name': 'No Edge'}
+
+        # Generowanie Scenariuszy (Warianty taktyczne)
+        scenarios = []
+        
+        # Scenariusz 1: CONSERVATIVE (Szeroki SL, Mały TP, Mały Size)
+        scenarios.append({
+            'name': 'Conservative Sniper',
+            'sl_dist': 0.02, # 2% SL
+            'tp_dist': 0.04, # 4% TP
+            'leverage': 1,
+            'risk_factor': 0.5 # Mniejsze ryzko
+        })
+        
+        # Scenariusz 2: BALANCED (Standard)
+        scenarios.append({
+            'name': 'Balanced Swing',
+            'sl_dist': 0.015,
+            'tp_dist': 0.05,
+            'leverage': 3,
+            'risk_factor': 1.0
+        })
+        
+        # Scenariusz 3: AGGRESSIVE (Ciasny SL, Duży TP, Leverage)
+        scenarios.append({
+            'name': 'Aggressive Scalp',
+            'sl_dist': 0.005, # 0.5% SL
+            'tp_dist': 0.02,
+            'leverage': 10,
+            'risk_factor': 2.0
+        })
+        
+        # Ocena Scenariuszy (Symulacja EV)
+        best_ev = -100
+        best_s = None
+        
+        for s in scenarios:
+            # Expected Value = (Win% * Reward) - (Loss% * Risk)
+            # Modyfikujemy Win% w zależności od tego jak "ciasny" jest SL (im ciaśniejszy tym łatwiej go wybić szumem)
+            
+            # Penalize tight SL based on volatility (placeholder volatility)
+            volatility_penalty = 1.0
+            if s['sl_dist'] < 0.01: volatility_penalty = 0.8 # Tight SL reduces winrate
+            
+            win_rate = base_confidence * volatility_penalty
+            loss_rate = 1.0 - win_rate
+            
+            reward_amt = s['tp_dist'] * s['leverage']
+            risk_amt = s['sl_dist'] * s['leverage']
+            
+            ev = (win_rate * reward_amt) - (loss_rate * risk_amt)
+            
+            s['ev'] = ev
+            s['final_confidence'] = win_rate
+            
+            if ev > best_ev:
+                best_ev = ev
+                best_s = s
+        
+        # Tworzenie finalnej decyzji
+        if best_s and best_ev > 0.01: # Musi mieć sensowne EV
+            return {
+                'action': bias,
+                'confidence': best_s['final_confidence'],
+                'setup_name': best_s['name'],
+                'params': {
+                    'sl': best_s['sl_dist'],
+                    'tp': best_s['tp_dist'],
+                    'leverage': best_s['leverage']
+                },
+                'reasoning': [f"Best Scenario: {best_s['name']} (EV: {best_ev:.4f})"]
+            }
+        else:
+            return {'action': 'HOLD', 'confidence': 0.5, 'setup_name': 'Low EV', 'reasoning': ['All scenarios had low EV']}
     
     def _lstm_predict(self, df):
         """LSTM price prediction (from existing brain.py)"""

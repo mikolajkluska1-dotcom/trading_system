@@ -1,0 +1,207 @@
+{
+    "name": "🐋 Whale Watcher Pro (Advanced)",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "seconds",
+                            "secondsInterval": 15
+                        }
+                    ]
+                }
+            },
+            "id": "whale-trigger",
+            "name": "⏱️ Every 15 Seconds",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                0,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "http://redline_backend:8000/api/whale/realtime",
+                "options": {
+                    "timeout": 10000
+                }
+            },
+            "id": "get-whale-data",
+            "name": "🐋 Get Whale Transactions",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                220,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// WHALE ANALYSIS ENGINE\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const transactions = item.json.transactions || [];\n  \n  // Analyze whale behavior\n  let totalBuyVolume = 0;\n  let totalSellVolume = 0;\n  let largeTransactions = [];\n  let whaleCount = 0;\n  \n  for (const tx of transactions) {\n    const volume = tx.amount_usd || 0;\n    \n    // Whale threshold: $100k+\n    if (volume >= 100000) {\n      whaleCount++;\n      largeTransactions.push({\n        type: tx.type,\n        amount: volume,\n        symbol: tx.symbol,\n        exchange: tx.exchange || 'Unknown'\n      });\n      \n      if (tx.type === 'BUY') {\n        totalBuyVolume += volume;\n      } else if (tx.type === 'SELL') {\n        totalSellVolume += volume;\n      }\n    }\n  }\n  \n  // Calculate whale bias\n  let whaleBias = 'NEUTRAL';\n  let biasStrength = 0;\n  const netFlow = totalBuyVolume - totalSellVolume;\n  \n  if (Math.abs(netFlow) > 500000) { // $500k threshold\n    whaleBias = netFlow > 0 ? 'BULLISH' : 'BEARISH';\n    biasStrength = Math.min(Math.abs(netFlow) / 5000000, 1); // Normalize to 0-1\n  }\n  \n  // Alert levels\n  let alertLevel = 'LOW';\n  let alertEmoji = '🟢';\n  \n  if (whaleCount >= 5 || Math.abs(netFlow) > 2000000) {\n    alertLevel = 'CRITICAL';\n    alertEmoji = '🔴';\n  } else if (whaleCount >= 3 || Math.abs(netFlow) > 1000000) {\n    alertLevel = 'HIGH';\n    alertEmoji = '🟠';\n  } else if (whaleCount >= 1 || Math.abs(netFlow) > 500000) {\n    alertLevel = 'MEDIUM';\n    alertEmoji = '🟡';\n  }\n  \n  // Top 3 largest transactions\n  const topTransactions = largeTransactions\n    .sort((a, b) => b.amount - a.amount)\n    .slice(0, 3)\n    .map(tx => `${tx.type}: $${(tx.amount/1000000).toFixed(2)}M`);\n  \n  results.push({\n    json: {\n      whale_count: whaleCount,\n      total_buy_volume: totalBuyVolume,\n      total_sell_volume: totalSellVolume,\n      net_flow: netFlow,\n      net_flow_formatted: `$${(Math.abs(netFlow)/1000000).toFixed(2)}M ${netFlow > 0 ? 'IN' : 'OUT'}`,\n      whale_bias: whaleBias,\n      bias_strength: (biasStrength * 100).toFixed(0) + '%',\n      alert_level: alertLevel,\n      alert_emoji: alertEmoji,\n      top_transactions: topTransactions.join(' | ') || 'None',\n      timestamp: new Date().toISOString(),\n      summary: `${alertEmoji} ${alertLevel}: ${whaleCount} whales, ${whaleBias} bias (${(biasStrength*100).toFixed(0)}%), Net: $${(netFlow/1000000).toFixed(2)}M`\n    }\n  });\n}\n\nreturn results;"
+            },
+            "id": "analyze-whales",
+            "name": "📊 Analyze Whale Behavior",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                460,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.alert_level }}",
+                            "rightValue": "LOW",
+                            "operator": {
+                                "type": "string",
+                                "operation": "notEquals"
+                            }
+                        }
+                    ]
+                }
+            },
+            "id": "alert-filter",
+            "name": "🎯 Significant Activity?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                700,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/whale/alert",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"level\": \"{{ $json.alert_level }}\",\n  \"bias\": \"{{ $json.whale_bias }}\",\n  \"net_flow\": {{ $json.net_flow }},\n  \"whale_count\": {{ $json.whale_count }},\n  \"summary\": \"{{ $json.summary }}\"\n}"
+            },
+            "id": "send-alert",
+            "name": "🚨 Send Whale Alert",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                940,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/ai/whale_signal",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"whale_bias\": \"{{ $json.whale_bias }}\",\n  \"strength\": {{ parseFloat($json.bias_strength) / 100 }},\n  \"whale_count\": {{ $json.whale_count }}\n}"
+            },
+            "id": "notify-ai",
+            "name": "🧠 Notify Mother Brain",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                940,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://redline_backend:8000/api/log",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"type\": \"WHALE_ACTIVITY\",\n  \"level\": \"{{ $json.alert_level }}\",\n  \"data\": {{ JSON.stringify($json) }}\n}"
+            },
+            "id": "log-whale",
+            "name": "📝 Log Activity",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1180,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "⏱️ Every 15 Seconds": {
+            "main": [
+                [
+                    {
+                        "node": "🐋 Get Whale Transactions",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🐋 Get Whale Transactions": {
+            "main": [
+                [
+                    {
+                        "node": "📊 Analyze Whale Behavior",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "📊 Analyze Whale Behavior": {
+            "main": [
+                [
+                    {
+                        "node": "🎯 Significant Activity?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🎯 Significant Activity?": {
+            "main": [
+                [
+                    {
+                        "node": "🚨 Send Whale Alert",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "🧠 Notify Mother Brain",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                []
+            ]
+        },
+        "🚨 Send Whale Alert": {
+            "main": [
+                [
+                    {
+                        "node": "📝 Log Activity",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🧠 Notify Mother Brain": {
+            "main": [
+                [
+                    {
+                        "node": "📝 Log Activity",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

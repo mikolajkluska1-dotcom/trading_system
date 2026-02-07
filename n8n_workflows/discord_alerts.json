@@ -1,0 +1,79 @@
+{
+    "name": "📱 Discord/Telegram Alerts",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "alert",
+                "options": {}
+            },
+            "id": "webhook",
+            "name": "🔔 Receive Alert",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                0,
+                300
+            ],
+            "webhookId": "trading-alerts"
+        },
+        {
+            "parameters": {
+                "jsCode": "const data = $input.first().json;\n\nlet emoji = '📊';\nlet color = 0x3498db; // Blue\n\nif (data.type === 'TRADE') {\n  emoji = data.action === 'BUY' ? '🟢' : '🔴';\n  color = data.action === 'BUY' ? 0x2ecc71 : 0xe74c3c;\n} else if (data.type === 'WHALE') {\n  emoji = '🐋';\n  color = 0x9b59b6;\n} else if (data.type === 'ALERT') {\n  emoji = '⚠️';\n  color = 0xf39c12;\n}\n\nreturn [{\n  json: {\n    content: null,\n    embeds: [{\n      title: `${emoji} ${data.title || 'Trading Alert'}`,\n      description: data.message || 'No message',\n      color: color,\n      fields: [\n        {name: 'Symbol', value: data.symbol || 'N/A', inline: true},\n        {name: 'Action', value: data.action || 'INFO', inline: true},\n        {name: 'Confidence', value: (data.confidence ? (data.confidence * 100).toFixed(0) + '%' : 'N/A'), inline: true}\n      ],\n      timestamp: new Date().toISOString()\n    }]\n  }\n}];"
+            },
+            "id": "format",
+            "name": "🎨 Format Message",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json) }}",
+                "options": {}
+            },
+            "id": "discord",
+            "name": "💬 Send to Discord",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                480,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "🔔 Receive Alert": {
+            "main": [
+                [
+                    {
+                        "node": "🎨 Format Message",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "🎨 Format Message": {
+            "main": [
+                [
+                    {
+                        "node": "💬 Send to Discord",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}
